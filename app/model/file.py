@@ -11,7 +11,7 @@ class FileModel(db.Model):
     uid           : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
     series_uid    : Mapped[Uuid]      = mapped_column(Uuid, nullable=True)
     file_name     : Mapped[str]       = mapped_column(String, default='')
-    file_size     : Mapped[int]       = mapped_column(Integer,nullable=True)
+    file_size     : Mapped[int]       = mapped_column(Integer)
     file_datetime : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP)
     file_type     : Mapped[str]       = mapped_column(String)
     file_status   : Mapped[str]       = mapped_column(String)

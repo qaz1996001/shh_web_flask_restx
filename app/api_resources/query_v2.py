@@ -408,17 +408,24 @@ class QueryResources(Resource):
 
         # reslut = query.filter(TextReportModel.text.regexp_match('Stroke')).all()
         # print(reslut)
-        # print(db.select(TextReportModel).where(TextReportModel.text.regexp_match('Stroke')))
-        # paginate = db.paginate(
-        #     db.select(TextReportModel).where(TextReportModel.text.regexp_match('Stroke')),
-        #     page=1,
-        #     per_page=20
-        # )
-        # patient_model_list = paginate.items
-        # total = paginate.total
-        # print(patient_model_list)
-        # print(total)
-        return 'QueryResources V2'
+        # print(db.select(ListStudyTextReportModel).where(ListStudyTextReportModel.text.regexp_match('.*Stroke.*')))
+        paginate = db.paginate(
+            db.select(ListStudyTextReportModel).where(ListStudyTextReportModel.text.regexp_match('\dmm')),
+            page=1,
+            per_page=20
+        )
+        patient_model_list = paginate.items
+        total = paginate.total
+        result = query_ns.marshal(patient_model_list,query_list_study_text_report_items)
+        group_key = get_group_key_by_series(query_list_patient_items.keys())
+        jsonify_result = {'code': 2000,
+                          'key': list(query_list_study_text_report_items.keys()),
+                          'data': {"total": total,
+                                   "items": result},
+                          'group_key': group_key
+                          }
+        return jsonify(jsonify_result)
+        # return 'QueryResources V2'
 
     def list_patient_table(self):
         pass

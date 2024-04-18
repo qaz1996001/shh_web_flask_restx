@@ -4,3 +4,4 @@ from .project import ProjectModel,ProjectSeriesModel
 from .series import SeriesModel
 from .study import StudyModel,TextReportModel
 from .query import ListStudyTextReportModel,ListStudyModel,ListPatientModel,ListProjectStudyModel
+from .file import FileModel

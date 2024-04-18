@@ -14,10 +14,10 @@ SECRET_KEY = 'A0Zr98j/3yX R~XHH!jmN]LWX/,?RT'
 #                           os.path.join(r"D:\00_Chen\Task08\shh_web\app", DATABASE)
 
 # pgsql数据库连接信息,
-# SQLALCHEMY_DATABASE_URI = "postgresql://postgres:pgpassword@127.0.0.1:5432/shh"
+SQLALCHEMY_DATABASE_URI = "postgresql://postgres_n:postgres_p@127.0.0.1:5433/db_name"
 # sqlite
-file_path = pathlib.Path(__file__)
-db_path = file_path.parent.parent.joinpath('shh.db').absolute()
-# db_path = file_path.parent.parent.joinpath('shh_test.db').absolute()
-SQLALCHEMY_DATABASE_URI = f"sqlite:///{db_path}"
+# file_path = pathlib.Path(__file__)
+# db_path = file_path.parent.parent.joinpath('shh.db').absolute()
+# # db_path = file_path.parent.parent.joinpath('shh_test.db').absolute()
+# SQLALCHEMY_DATABASE_URI = f"sqlite:///{db_path}"
 print(SQLALCHEMY_DATABASE_URI)
