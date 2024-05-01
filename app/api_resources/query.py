@@ -7,11 +7,11 @@ import time
 import uuid
 from typing import List
 import pandas as pd
-from sqlalchemy.sql.expression import func
+from sqlalchemy.sql.expression import func,distinct
 
 from flask import jsonify, request
 from .base import UidFields, CountFields
-from ..model import PatientModel, StudyModel, ProjectModel, ProjectSeriesModel, PatientModel, TextReportModel, \
+from ..model import PatientModel, StudyModel, ProjectModel, ProjectSeriesModel, TextReportModel, \
     SeriesModel
 from .series import SeriesResources
 from .study import StudyResources
@@ -158,6 +158,14 @@ def get_page_limit_sort(request):
 @query_ns.route('/')
 class QueryResources(Resource):
     def get(self, ):
+        query = PatientModel.query
+        patient_model:PatientModel = query.first()
+        print(patient_model.study)
+        print(patient_model.study[0].series)
+        for series in patient_model.study[0].series:
+            print(series.series_description)
+            print(series.project[0].name)
+
         return 'QueryResources'
 
 
@@ -225,22 +233,22 @@ class QueryStudyResources(Resource):
         paginate         = db.paginate(query,page=page,per_page=limit)
         study_query_list = paginate.items
         total            = paginate.total
-        patient_uid_cache = dict()
+        # patient_uid_cache = dict()
         response_list = []
         for study_model in study_query_list:
-            patient_uid = study_model.patient_uid
-            if patient_uid in patient_uid_cache:
-                patient_model = patient_uid_cache[patient_uid]
-            else:
-                patient_model = PatientModel.query.filter_by(uid=patient_uid).first()
-                patient_uid_cache[patient_model.uid] = patient_model
+            # patient_uid = study_model.patient.patient_id
+            # if patient_uid in patient_uid_cache:
+            #     patient_model = patient_uid_cache[patient_uid]
+            # else:
+            #     patient_model = PatientModel.query.filter_by(uid=patient_uid).first()
+            #     patient_uid_cache[patient_model.uid] = patient_model
 
             study_dict = study_model.to_dict()
-            study_dict['patient_id'] = patient_model.patient_id
-            study_dict['gender'] = patient_model.gender
-            study_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=patient_model.birth_date,
+            study_dict['patient_id'] = study_model.patient.patient_id
+            study_dict['gender'] = study_model.patient.gender
+            study_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=study_model.patient.birth_date,
                                                                            study_date=study_model.study_date)
-            series_model_list = self.study_resources.get_series_info_by_study(study_model)
+            series_model_list = study_model.series
             for series_model in series_model_list:
                 temp_dict = copy(study_dict)
                 temp_dict['series_description'] = series_model.series_description
@@ -253,10 +261,6 @@ class QueryStudyResources(Resource):
                              values=['series_uid'],
                              aggfunc='count', fill_value=0)
         print(order_by,sort,page,limit)
-        # if order_by == '+':
-        #     df1 = df1.sort_values(by=sort)
-        # else:
-        #     df1 = df1.sort_values(by=sort,ascending=False)
 
         df1.columns = df1.columns.get_level_values('series_description')
         df1.reset_index(inplace=True)
@@ -266,26 +270,6 @@ class QueryStudyResources(Resource):
                                    "items": df1.to_dict(orient='records')}}
         # "items": orjson.loads(df1.to_json(orient='records'))}}
         return jsonify_result
-
-    def get_study_dict_list_by_study_model_list(self, study_model_list: List[StudyModel]):
-        response_list = []
-        patient_uid_cache = dict()
-        for study_model in study_model_list:
-            patient_uid = study_model.patient_uid
-            if patient_uid in patient_uid_cache:
-                patient_dict = patient_uid_cache[patient_uid]
-            else:
-                patient_model = PatientModel.query.filter_by(uid=patient_uid).first()
-                patient_dict = patient_model.to_dict()
-                patient_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=patient_model.birth_date,
-                                                                                 study_date=study_model.study_date
-                                                                                 )
-                patient_uid_cache[patient_uid] = patient_dict
-            study_dict = study_model.to_dict()
-            study_dict['gender'] = patient_dict['gender']
-            study_dict['age'] = patient_dict['age']
-            response_list.append(study_dict)
-        return response_list
 
 
 @query_ns.route('/list_series')
@@ -317,28 +301,19 @@ class QuerySeriesResources(Resource):
 
     def get_series_dict_list_by_series_model_list(self, series_model_list: List[PatientModel]):
         response_list = []
-        study_uid_cache = dict()
         for series_model in series_model_list:
-            study_uid = series_model.study_uid
-            if study_uid in study_uid_cache:
-                study_dict = study_uid_cache[study_uid]
-            else:
-                study_model = StudyModel.query.filter_by(uid=study_uid).first()
-                patient_model = PatientModel.query.filter_by(uid=study_model.patient_uid).first()
-                study_dict = study_model.to_dict()
-                study_dict['patient_id'] = patient_model.patient_id
-                study_dict['gender'] = patient_model.gender
-                study_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=patient_model.birth_date,
-                                                                               study_date=study_model.study_date
-                                                                               )
-                study_uid_cache[study_uid] = study_dict
+
+            study       = series_model.study
+            study_dict  = study.to_dict()
+            age = self.study_resources.get_age_by_study_date(study.patient.birth_date,
+                                                             study.study_date)
             series_dict = series_model.to_dict()
-            series_dict['study_uid'] = study_dict['uid']
-            series_dict['patient_id'] = study_dict['patient_id']
-            series_dict['gender'] = study_dict['gender']
-            series_dict['age'] = study_dict['age']
-            series_dict['study_date'] = study_dict['study_date']
-            series_dict['accession_number'] = study_dict['accession_number']
+            series_dict['study_uid']         = study.uid
+            series_dict['patient_id']        = study.patient.patient_id
+            series_dict['gender']            = study.patient.gender
+            series_dict['age']               = age
+            series_dict['study_date']        = study_dict['study_date']
+            series_dict['accession_number']  = study_dict['accession_number']
             series_dict['study_description'] = study_dict['study_description']
             response_list.append(series_dict)
         return response_list
@@ -381,6 +356,7 @@ class QueryListProjectResources(Resource):
 @query_ns.route('/list_project_series/<project_uid_str>')
 class QueryListProjectSeriesResources(Resource):
     query_series_resources = QuerySeriesResources()
+    study_resources = StudyResources()
 
     def get(self, project_uid_str=None):
         page = int(request.args.get('page', 1))
@@ -391,48 +367,69 @@ class QueryListProjectSeriesResources(Resource):
             project_model = ProjectModel.query.filter_by(uid=project_uid).first()
             if not project_model:
                 return {'error': ' project not found'}, 404
-            paginate = db.paginate(
-                db.select(ProjectSeriesModel).filter_by(projects_uid=project_uid).order_by(
-                    ProjectSeriesModel.uid.desc()),
-                page=page,
-                per_page=limit
-            )
-            project_series_model_list = paginate.items
+            query = (db.select(StudyModel).filter(StudyModel.uid.in_(
+                db.select(distinct(SeriesModel.study_uid)).join(ProjectSeriesModel,
+                                                                SeriesModel.uid == ProjectSeriesModel.series_uid) \
+                    .filter(ProjectSeriesModel.projects_uid == project_uid)))
+                    .order_by(StudyModel.accession_number.desc()))
+            paginate = db.paginate(query, page=page, per_page=limit)
+            project_study_model_list = paginate.items
             total = paginate.total
-
-            series_uid_list = list(map(lambda project_series_model: project_series_model.series_uid,
-                                       project_series_model_list))
-            series_dict_list = self.query_series_resources.get_series_dict_list_by_series_uid_list(
-                series_uid_list=series_uid_list)
             project_series_dict_list = []
-            for series_dict in series_dict_list:
-                project_series_dict_list.append(self.add_project_info(project_model, series_dict))
+            for study_model in project_study_model_list:
+                series_dict_list = list(map(lambda series_model: series_model.to_dict(),
+                                            study_model.series))
+                for series_dict in series_dict_list:
+                    study_dict = study_model.to_dict()
+                    age = self.study_resources.get_age_by_study_date(study_model.patient.birth_date,
+                                                                     study_model.study_date)
+                    series_dict['study_uid'] = study_dict['uid']
+                    series_dict['patient_id'] = study_model.patient.patient_id
+                    series_dict['gender'] = study_model.patient.gender
+                    series_dict['age'] = age
+                    series_dict['study_date'] = study_dict['study_date']
+                    series_dict['accession_number'] = study_dict['accession_number']
+                    series_dict['study_description'] = study_dict['study_description']
+                    project_series_dict_list.append(self.add_project_info(project_model, series_dict))
             result = query_ns.marshal(project_series_dict_list,
                                       query_list_project_series)
         else:
             project_model_list = ProjectModel.query.all()
             project_series_dict_list = []
+            total = 0
             for project_model in project_model_list:
                 start = time.time()
-                paginate = db.paginate(
-                    db.select(ProjectSeriesModel).filter_by(projects_uid=project_model.uid).order_by(
-                        ProjectSeriesModel.uid.desc()),
-                    page=page,
-                    per_page=limit
-                )
+                query = db.select(StudyModel).filter(StudyModel.uid.in_(
+                    db.select(distinct(SeriesModel.study_uid)).join(ProjectSeriesModel,
+                                                          SeriesModel.uid == ProjectSeriesModel.series_uid) \
+                      .filter(ProjectSeriesModel.projects_uid == project_model.uid)
+                )).order_by(StudyModel.accession_number.desc())
+                paginate = db.paginate(query,
+                                       page=page,per_page=limit)
 
-                project_series_model_list = paginate.items
-                series_uid_list = list(map(lambda project_series_model: project_series_model.series_uid,
-                                           project_series_model_list))
-                series_dict_list = self.query_series_resources.get_series_dict_list_by_series_uid_list(
-                    series_uid_list=series_uid_list)
-                for series_dict in series_dict_list:
-                    project_series_dict_list.append(self.add_project_info(project_model, series_dict))
+
+                project_study_model_list = paginate.items
+                total                    = paginate.total + total
+                for study_model in project_study_model_list:
+                    series_dict_list = list(map(lambda series_model: series_model.to_dict(),
+                                                study_model.series))
+                    for series_dict in series_dict_list:
+                        study_dict = study_model.to_dict()
+                        age = self.study_resources.get_age_by_study_date(study_model.patient.birth_date,
+                                                                         study_model.study_date)
+                        series_dict['study_uid']  = study_dict['uid']
+                        series_dict['patient_id'] = study_model.patient.patient_id
+                        series_dict['gender']     = study_model.patient.gender
+                        series_dict['age']        = age
+                        series_dict['study_date'] = study_dict['study_date']
+                        series_dict['accession_number'] = study_dict['accession_number']
+                        series_dict['study_description'] = study_dict['study_description']
+                        project_series_dict_list.append(self.add_project_info(project_model, series_dict))
                 end = time.time()
-                print(project_model.name, (end - start), len(series_dict_list))
             result = query_ns.marshal(project_series_dict_list,
                                       query_list_project_series)
         df = pd.json_normalize(result)
+
         df1 = df.pivot_table(index=['project_name',
                                     'patient_id', 'study_date', 'gender', 'age',
                                     'study_description', 'accession_number'],
@@ -443,7 +440,7 @@ class QueryListProjectSeriesResources(Resource):
         df1.reset_index(inplace=True)
         jsonify_result = {'code': 2000,
                           'key': df1.columns.to_list(),
-                          'data': {"total": df1.shape[0],
+                          'data': {"total": total,
                                    "items": df1.to_dict(orient='records')}}
         return jsonify_result
 
@@ -528,12 +525,12 @@ class QueryListStudyTextReportResources(Resource):
             total = paginate.total
 
             study_uid_list = list(map(lambda x: x.uid, study_query))
-            study_text_report_dict_query = db.session.execute(db.select(StudyModel, TextReportModel)
-                                                              .filter(StudyModel.uid.in_(study_uid_list))
-                                                              .join(TextReportModel,
+            study_text_report_dict_query = db.s3_session.execute(db.select(StudyModel, TextReportModel)
+                                                                 .filter(StudyModel.uid.in_(study_uid_list))
+                                                                 .join(TextReportModel,
                                                                     StudyModel.uid == TextReportModel.study_uid,
                                                                     isouter=True)
-                                                              .order_by(StudyModel.study_date.asc())).all()
+                                                                 .order_by(StudyModel.study_date.asc())).all()
             study_text_report_dict_list = []
             for i in range(len(study_text_report_dict_query)):
                 study_dict = self.query_study_resources.study_resources.get_patient_info_by_study(

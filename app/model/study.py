@@ -1,6 +1,9 @@
 import datetime
-from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP, Date, Time, Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import List
+
+from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP, Date, Time, Uuid,ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column,relationship
+import sqlalchemy as sa
 
 from .. import db
 from . import gen_id
@@ -9,11 +12,14 @@ from . import gen_id
 class StudyModel(db.Model):
     __tablename__ = 'study'
     uid               : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    patient_uid       : Mapped[Uuid]      = mapped_column(Uuid, index=True)
+    # patient_uid       : Mapped[Uuid]      = mapped_column(Uuid, index=True)
+    patient_uid       : Mapped[Uuid]         = mapped_column(Uuid,ForeignKey('patient.uid'), index=True)
+    patient           : Mapped["PatientModel"] = relationship(back_populates='study', uselist=False)
     study_date        : Mapped[Date]      = mapped_column(Date, index=True)
     study_time        : Mapped[Time]      = mapped_column(Time)
     study_description : Mapped[str]       = mapped_column(String)
     accession_number  : Mapped[str]       = mapped_column(String, index=True)
+    series            : Mapped[List["SeriesModel"]] = relationship(back_populates="study")
     orthanc_study_ID  : Mapped[str]       = mapped_column(String, nullable=True)
     created_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)

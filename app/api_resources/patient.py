@@ -78,9 +78,9 @@ class PatientResources(Resource):
             patient_model.birth_date = birth_date_obj
             patient_model.orthanc_patient_ID = orthanc_patient_ID
             patient_model.created_at = datetime.datetime.now()
-            db.session.add(patient_model)
-            db.session.commit()
-            db.session.refresh(patient_model)
+            db.s3_session.add(patient_model)
+            db.s3_session.commit()
+            db.s3_session.refresh(patient_model)
             return patient_model
         return None
     @staticmethod
@@ -162,9 +162,9 @@ class PatientsResources(Resource):
             patient_model.birth_date = birth_date
             patient_model.orthanc_patient_ID = orthanc_patient_ID
             patient_model.created_at = datetime.datetime.now()
-            db.session.add(patient_model)
-            db.session.commit()
-            db.session.refresh(patient_model)
+            db.s3_session.add(patient_model)
+            db.s3_session.commit()
+            db.s3_session.refresh(patient_model)
         return patient_model
 
     @staticmethod

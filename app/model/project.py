@@ -1,6 +1,8 @@
 import datetime
-from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP, Date, Time,Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import List
+
+from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP, Date, Time,Uuid,ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .. import db
 from . import gen_id
@@ -15,7 +17,8 @@ class ProjectModel(db.Model):
     created_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     deleted_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-
+    series             : Mapped[List["SeriesModel"]] = relationship(secondary="project_series",
+                                                                    back_populates="project")
     def to_dict(self):
         dict_ = {
             'uid'                : self.uid.hex,
@@ -47,12 +50,12 @@ class ProjectModel(db.Model):
 class ProjectSeriesModel(db.Model):
     __tablename__ = 'project_series'
     uid          : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    series_uid   : Mapped[Uuid]      = mapped_column(Uuid,index=True)
-    projects_uid : Mapped[Uuid]      = mapped_column(Uuid,index=True)
+    series_uid   : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('series.uid'),index=True)
+    projects_uid : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('project.uid'),index=True)
     created_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     deleted_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-
+    # series: Mapped[List["SeriesModel"]] = relationship(back_populates="study")
     def to_dict(self):
         dict_ = {
             'uid'          : self.uid.hex,

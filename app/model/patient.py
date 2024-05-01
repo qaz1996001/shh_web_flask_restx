@@ -1,6 +1,8 @@
 import datetime
-from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP,Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import List
+
+from sqlalchemy import Integer, String, DateTime, TIMESTAMP,Uuid
+from sqlalchemy.orm import Mapped, mapped_column,relationship
 
 from .. import db
 from . import gen_id
@@ -16,7 +18,7 @@ class PatientModel(db.Model):
     created_at          : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at          : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     deleted_at          : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-
+    study               : Mapped[List["StudyModel"]] = relationship( back_populates="patient")
     def to_dict(self):
         dict_ = {
             'uid'                 : self.uid.hex,

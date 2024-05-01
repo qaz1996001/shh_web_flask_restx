@@ -110,9 +110,9 @@ class SeriesResources(Resource):
             series.series_description = series_description
             series.modality = modality
             series.created_at = datetime.datetime.now()
-            db.session.add(series)
-            db.session.commit()
-            db.session.refresh(series)
+            db.s3_session.add(series)
+            db.s3_session.commit()
+            db.s3_session.refresh(series)
             return series
         return None
 

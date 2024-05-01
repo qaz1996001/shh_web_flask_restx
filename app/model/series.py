@@ -1,6 +1,8 @@
 import datetime
-from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP, Date, Time,Uuid
-from sqlalchemy.orm import Mapped, mapped_column
+from typing import List
+
+from sqlalchemy import Integer, String, DateTime, TIMESTAMP, Date, Time,Uuid,ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column,relationship
 
 from .. import db
 from . import gen_id
@@ -9,7 +11,9 @@ from . import gen_id
 class SeriesModel(db.Model):
     __tablename__ = 'series'
     uid                : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    study_uid          : Mapped[Uuid]      = mapped_column(Uuid,index=True)
+    # study_uid          : Mapped[Uuid]      = mapped_column(Uuid,index=True)
+    study_uid          : Mapped[Uuid] = mapped_column(Uuid,ForeignKey('study.uid'), index=True)
+    study              : Mapped["StudyModel"] = relationship(back_populates='series', uselist=False)
     series_date        : Mapped[Date]      = mapped_column(Date)
     series_time        : Mapped[Time]      = mapped_column(Time)
     series_description : Mapped[str]       = mapped_column(String,index=True)
@@ -19,7 +23,8 @@ class SeriesModel(db.Model):
     created_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     deleted_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-
+    project: Mapped[List["ProjectModel"]] = relationship(secondary="project_series",
+                                                         back_populates="series")
     def to_dict(self):
         dict_ = {
             'uid'                : self.uid.hex,

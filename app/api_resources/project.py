@@ -38,12 +38,12 @@ class ProjectResources(Resource):
             project_model: ProjectModel = ProjectModel.query.filter_by(uid=uid).first()
             if not project_model:
                 return {'error': 'project not found'}, 404
-            (db.session.query(ProjectModel).filter_by(uid=project_model.uid)
+            (db.s3_session.query(ProjectModel).filter_by(uid=project_model.uid)
                .update(dict(name=name)))
-            (db.session.query(ListProjectStudyModel).filter_by(project_name=project_model.uid)
+            (db.s3_session.query(ListProjectStudyModel).filter_by(project_name=project_model.uid)
                .update(dict(project_name=name)))
 
-            db.session.commit()
+            db.s3_session.commit()
             return {'message': 'Project update'}
         else:
             return {'error': 'No project specified'}, 404
@@ -55,10 +55,10 @@ class ProjectResources(Resource):
             project_model: ProjectModel = ProjectModel.query.filter_by(uid=uid).first()
             if not project_model:
                 return {'error': 'project not found'}, 404
-            db.session.query(ProjectSeriesModel).filter_by(projects_uid=project_model.uid).delete()
-            db.session.query(ListProjectStudyModel).filter_by(project_uid=project_model.uid).delete()
-            db.session.query(ProjectModel).filter_by(uid=project_model.uid).delete()
-            db.session.commit()
+            db.s3_session.query(ProjectSeriesModel).filter_by(projects_uid=project_model.uid).delete()
+            db.s3_session.query(ListProjectStudyModel).filter_by(project_uid=project_model.uid).delete()
+            db.s3_session.query(ProjectModel).filter_by(uid=project_model.uid).delete()
+            db.s3_session.commit()
             return {'message': 'Project deleted'}
         else:
             return {'error': 'No project specified'}, 404
@@ -81,9 +81,9 @@ class ProjectsResources(Resource):
 
             project_model = ProjectModel()
             project_model.name = name
-            db.session.add(project_model)
-            db.session.commit()
-            db.session.refresh(project_model)
+            db.s3_session.add(project_model)
+            db.s3_session.commit()
+            db.s3_session.refresh(project_model)
             # db.relationship()
             return {'data': project_model.to_dict()}, 201
         else:

@@ -1,17 +1,18 @@
 import calendar
 import datetime
 import re
+from typing import List
 
 import orjson
 from flask_restx import Resource, fields, Namespace
 import uuid
 import pandas as pd
-
+from sqlalchemy import and_
 from sqlalchemy_filters import apply_filters
-from sqlalchemy import func
 from flask import jsonify, request
 from .base import UidFields
-from ..model import ListStudyTextReportModel, ListStudyModel, ListPatientModel, ListProjectStudyModel, ProjectModel,TextReportModel
+from ..model import ListStudyTextReportModel, ListStudyModel, ListPatientModel, ListProjectStudyModel, ProjectModel, \
+    TextReportModel, SeriesModel, PatientModel, StudyModel
 from flask_marshmallow.fields import fields as mafields
 from .. import db, ma
 
@@ -360,9 +361,10 @@ def get_query_filter(request):
 query_filter_items = query_ns.model('query_filter_items',
                                     {"field": fields.String(),
                                      "op": fields.String(),
-                                     "value": fields.String(),})
+                                     "value": fields.String(), })
 
 filter_list_project_series = fields.List(fields.Nested(query_filter_items))
+
 filter_list_project_series.default = """
   [{
     "field":"age",
@@ -375,8 +377,7 @@ filter_list_project_series.default = """
   ]
 """
 query_filter_list_project_series = query_ns.model('query_filter_list_project_series',
-                                                    {"filter_": filter_list_project_series,})
-
+                                                  {"filter_": filter_list_project_series, })
 
 filter_list_study_text_report = fields.List(fields.Nested(query_filter_items))
 filter_list_study_text_report.default = """
@@ -391,7 +392,16 @@ filter_list_study_text_report.default = """
   ]
 """
 query_filter_list_study_text_report = query_ns.model('query_filter_list_study_text_report',
-                                                    {"filter_": filter_list_study_text_report,})
+                                                     {"filter_": filter_list_study_text_report, })
+
+filter_op_list = ['is_null', 'is_not_null',
+                  '==', '!=',
+                  '>', '<',
+                  '>=', '<=',
+                  'like',
+                  'ilike', 'not_ilike',
+                  'in', 'not_in',
+                  'any', 'not_any']
 
 
 ########## query_filter( ##############################
@@ -416,7 +426,7 @@ class QueryResources(Resource):
         )
         patient_model_list = paginate.items
         total = paginate.total
-        result = query_ns.marshal(patient_model_list,query_list_study_text_report_items)
+        result = query_ns.marshal(patient_model_list, query_list_study_text_report_items)
         group_key = get_group_key_by_series(query_list_patient_items.keys())
         jsonify_result = {'code': 2000,
                           'key': list(query_list_study_text_report_items.keys()),
@@ -460,7 +470,7 @@ class QueryResources(Resource):
         db_df[['study_date', 'study_time']] = db_df[['study_date', 'study_time']].astype(str)
 
         db_df['study_time'] = db_df['study_time'].map(lambda x: x.split('.')[0])
-        session = db.session()
+        session = db.s3_session()
         error_case_list = []
         for index, row in db_df.iterrows():
             try:
@@ -573,15 +583,21 @@ class QueryPatientResources(Resource):
 @query_ns.param('limit', type=int)
 @query_ns.param('sort', type=str)
 class QueryStudyResources(Resource):
-    # @query_ns.marshal_with(query_list_study)
+    list_study_filter_op_list = filter_op_list
+
     def get(self, ):
         page, limit, sort_column = get_page_limit_sort(request=request, model=ListStudyModel, default='+study_uid')
         query = ListStudyModel.query
         filter_ = get_query_filter(request=request)
         if filter_:
-            filtered_query = apply_filters(query, filter_)
-            paginate = filtered_query.order_by(sort_column).paginate(page=page,
-                                                                     per_page=limit)
+            series_description_filter = list(lambda x: x['field'] == 'series_description', filter_)
+            orther_filter = list(lambda x: x['field'] != 'series_description', filter_)
+            filtered_query = apply_filters(query, orther_filter)
+            paginate = (filtered_query.filter(ListStudyModel.
+                                              series_description.op("->")(
+                series_description_filter[0]['field']) is not None).
+                        order_by(sort_column).paginate(page=page,
+                                                       per_page=limit))
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
                                                             per_page=limit)
@@ -593,14 +609,52 @@ class QueryStudyResources(Resource):
         columns = list(
             map(lambda x: x.replace('series_description.', '') if 'series_description.' in x else x, df.columns))
         df.columns = columns
-        # df.drop(columns=['series_description'], inplace=True)
         group_key = get_group_key_by_series(columns)
         df.fillna(0, inplace=True)
         jsonify_result = {'code': 2000,
                           'key': columns,
                           'data': {"total": total,
                                    "items": df.to_dict(orient='records')},
-                          'group_key': group_key
+                          'group_key': group_key,
+                          'op_list': self.list_study_filter_op_list
+                          }
+        return jsonify(jsonify_result)
+
+    def post(self, ):
+        page, limit, sort_column = get_page_limit_sort(request=request, model=ListStudyModel, default='+study_uid')
+        query = ListStudyModel.query
+        filter_ = filter_schema.dump(request.json['filter_'], many=True)
+        if filter_:
+            series_description_filter = list(filter(lambda x: x['field'] == 'series_description', filter_))
+            series_description_filter = list(
+                map(lambda x: and_(ListStudyModel.series_description.op("->>")(x['value']).is_not(None)),
+                    series_description_filter))
+            orther_filter = list(filter(lambda x: x['field'] != 'series_description', filter_))
+            filtered_query = apply_filters(query, orther_filter)
+            paginate = (filtered_query.filter(*series_description_filter).order_by(sort_column).paginate(page=page,
+                                                                                                         per_page=limit))
+            print(filtered_query.filter(*series_description_filter).order_by(sort_column))
+        else:
+            paginate = query.order_by(sort_column).paginate(page=page,
+                                                            per_page=limit)
+
+        list_study_model_result = paginate.items
+        total = paginate.total
+        print(total)
+        # response_list = list(map(lambda x: x.to_dict(), list_study_model_result))
+        response_list = list(map(self.get_series_description_json, list_study_model_result))
+        df = pd.json_normalize(response_list)
+        columns = list(
+            map(lambda x: x.replace('series_description.', '') if 'series_description.' in x else x, df.columns))
+        df.columns = columns
+        group_key = get_group_key_by_series(columns)
+        df.fillna(0, inplace=True)
+        jsonify_result = {'code': 2000,
+                          'key': columns,
+                          'data': {"total": total,
+                                   "items": df.to_dict(orient='records')},
+                          'group_key': group_key,
+                          'op_list': self.list_study_filter_op_list
                           }
         return jsonify(jsonify_result)
 
@@ -611,17 +665,68 @@ class QueryStudyResources(Resource):
         else:
             series_description = list_study_model.series_description
         list_study_model_dict.update(series_description)
+        list_study_model_dict.pop('series_description')
         return list_study_model_dict
 
 
-@query_ns.route('/lis')
-@query_ns.param('page', type=int)
-@query_ns.param('limit', type=int)
-@query_ns.param('sort', type=str)
+# @query_ns.route('/list_series')
+# @query_ns.param('page', type=int)
+# @query_ns.param('limit', type=int)
+# @query_ns.param('sort', type=str)
 class QuerySeriesResources(Resource):
     @query_ns.marshal_with(query_list_series)
     def get(self, ):
-        pass
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 20))
+        sort = request.args.get('sort', '-patients_id')
+        paginate = db.paginate(
+            db.select(SeriesModel).order_by(SeriesModel.series_date.asc()),
+            page=page,
+            per_page=limit
+        )
+        series_model_list = paginate.items
+        response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
+        result = query_ns.marshal(response_list,
+                                  query_list_series_items)
+        df = pd.json_normalize(result)
+        jsonify_result = {'code': 2000,
+                          'key': df.columns.to_list(),
+                          'data': {"total": paginate.total,
+                                   "items": df.to_dict(orient='records')}}
+        return jsonify_result
+
+    def get_series_dict_list_by_series_model_list(self, series_model_list: List[PatientModel]):
+        response_list = []
+        study_uid_cache = dict()
+        for series_model in series_model_list:
+            study_uid = series_model.study_uid
+            if study_uid in study_uid_cache:
+                study_dict = study_uid_cache[study_uid]
+            else:
+                study_model = StudyModel.query.filter_by(uid=study_uid).first()
+                patient_model = PatientModel.query.filter_by(uid=study_model.patient_uid).first()
+                study_dict = study_model.to_dict()
+                study_dict['patient_id'] = patient_model.patient_id
+                study_dict['gender'] = patient_model.gender
+                study_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=patient_model.birth_date,
+                                                                               study_date=study_model.study_date
+                                                                               )
+                study_uid_cache[study_uid] = study_dict
+            series_dict = series_model.to_dict()
+            series_dict['study_uid'] = study_dict['uid']
+            series_dict['patient_id'] = study_dict['patient_id']
+            series_dict['gender'] = study_dict['gender']
+            series_dict['age'] = study_dict['age']
+            series_dict['study_date'] = study_dict['study_date']
+            series_dict['accession_number'] = study_dict['accession_number']
+            series_dict['study_description'] = study_dict['study_description']
+            response_list.append(series_dict)
+        return response_list
+
+    def get_series_dict_list_by_series_uid_list(self, series_uid_list: List[uuid.UUID]):
+        series_model_list = SeriesModel.query.filter(SeriesModel.uid.in_(series_uid_list)).all()
+        response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
+        return response_list
 
 
 @query_ns.route('/list_project')
@@ -758,8 +863,8 @@ class QueryListStudyTextReportResources(Resource):
                           'key': columns,
                           'data': {"total": total,
                                    "items": df.to_dict(orient='records')},
-                          'group_key': group_key}
-        print('group_key', group_key)
+                          'group_key': group_key,
+                          'op_list': filter_op_list}
         return jsonify(jsonify_result)
 
     @query_ns.param('page', type=int, default='1')
@@ -793,5 +898,6 @@ class QueryListStudyTextReportResources(Resource):
                           'key': columns,
                           'data': {"total": total,
                                    "items": df.to_dict(orient='records')},
-                          'group_key': group_key}
+                          'group_key': group_key,
+                          'op_list': filter_op_list}
         return jsonify(jsonify_result)

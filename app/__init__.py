@@ -19,9 +19,21 @@ cors = CORS(app)
 # Marshmallow
 ma = Marshmallow(app)
 
+
+# #Object Storage
+from boto3.session import Session as S3Session
+OBJECT_WEB_URL = 'http://127.0.0.1:9000'
+OBJECT_WEB_access_key = "bHRhU4yBlvx1VkEVhdIC"
+OBJECT_WEB_secret_key = "SyRR1s7WKeav9WFmjtJuwACZNvYcl5S8vryr7uLz"
+OBJECT_BUCKET_NAME = 'test'
+s3_session = S3Session(OBJECT_WEB_access_key, OBJECT_WEB_secret_key)
+s3_client = s3_session.client('s3', endpoint_url=OBJECT_WEB_URL, verify=False)
+
+
 from .api_resources import api_blueprint
 
 app.register_blueprint(api_blueprint)
+
 
 
 @app.route('/')

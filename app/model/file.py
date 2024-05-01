@@ -1,5 +1,5 @@
 import datetime
-from sqlalchemy import Integer, String, TIMESTAMP, Uuid
+from sqlalchemy import Integer, String, TIMESTAMP, Uuid,ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .. import db
@@ -9,12 +9,12 @@ from . import gen_id
 class FileModel(db.Model):
     __tablename__ = 'file'
     uid           : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    series_uid    : Mapped[Uuid]      = mapped_column(Uuid, nullable=True)
+    series_uid    : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('series.uid'), nullable=True)
     file_name     : Mapped[str]       = mapped_column(String, default='')
     file_size     : Mapped[int]       = mapped_column(Integer)
     file_datetime : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP)
-    file_type     : Mapped[str]       = mapped_column(String)
-    file_status   : Mapped[str]       = mapped_column(String)
+    file_type     : Mapped[str]       = mapped_column(String, nullable=True)
+    file_status   : Mapped[str]       = mapped_column(String, nullable=True)
     file_url      : Mapped[str]       = mapped_column(String)
 
     def to_dict(self):
