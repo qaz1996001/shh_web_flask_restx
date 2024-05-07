@@ -394,14 +394,16 @@ filter_list_study_text_report.default = """
 query_filter_list_study_text_report = query_ns.model('query_filter_list_study_text_report',
                                                      {"filter_": filter_list_study_text_report, })
 
-filter_op_list = ['is_null', 'is_not_null',
+filter_op_list = [#'is_null',
+                  'is_not_null',
                   '==', '!=',
                   '>', '<',
                   '>=', '<=',
                   'like',
-                  'ilike', 'not_ilike',
-                  'in', 'not_in',
-                  'any', 'not_any']
+                  #'ilike', 'not_ilike',
+                  'in', #'not_in',
+                  #'any', 'not_any'
+                  ]
 
 
 ########## query_filter( ##############################
@@ -831,7 +833,8 @@ class QueryListProjectSeriesResources(Resource):
 
 @query_ns.route('/list_study_text_report')
 class QueryListStudyTextReportResources(Resource):
-
+    pattern_impression_str = re.compile(r'(?i:impression\s?:?|imp:?|conclusions?:?)')
+    pattern_depiction      = re.compile(r'Summary :\n(.*)(\n.+)醫師', re.DOTALL)
     # @query_ns.marshal_with(query_list_study_text_report)
     @query_ns.param('page', type=int, default='1')
     @query_ns.param('limit', type=int, default='20')
@@ -856,9 +859,11 @@ class QueryListStudyTextReportResources(Resource):
 
         response_list = list(map(lambda x: x.to_dict(), list_study_text_result))
         df: pd.DataFrame = pd.json_normalize(response_list)
+        df['impression_str'] = df['text'].map(self.get_impression_str)
         columns = df.columns.to_list()
         group_key = get_group_key_by_series(columns)
         group_key['general_keys'].append('text')
+        group_key['general_keys'].append('impression_str')
         jsonify_result = {'code': 2000,
                           'key': columns,
                           'data': {"total": total,
@@ -866,6 +871,20 @@ class QueryListStudyTextReportResources(Resource):
                           'group_key': group_key,
                           'op_list': filter_op_list}
         return jsonify(jsonify_result)
+
+    # def gtemp(self):
+    def get_impression_str(self,x):
+        # result_impression_str = pattern_impression_str.search(x)
+        depiction_match = self.pattern_depiction.search(x)
+        if depiction_match:
+            depiction = depiction_match.group(1)
+            result_impression_str = self.pattern_impression_str.split(depiction)
+            if len(result_impression_str) > 0:
+                return result_impression_str[-1]
+            else:
+                return ''
+        return ''
+    # df3['impression_str'] = df3['depiction'].map(get_impression_str)
 
     @query_ns.param('page', type=int, default='1')
     @query_ns.param('limit', type=int, default='20')
@@ -880,9 +899,11 @@ class QueryListStudyTextReportResources(Resource):
         filter_ = filter_schema.dump(request.json['filter_'], many=True)
         if filter_:
             filtered_query = apply_filters(query, filter_)
-            paginate = filtered_query.order_by(sort_column).paginate(page=page,
-                                                                     per_page=limit)
-            # print(filtered_query)
+
+            paginate = (filtered_query
+                        .filter(ListStudyTextReportModel.is_success == 1)
+                        .order_by(sort_column).paginate(page=page,
+                                                        per_page=limit))
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
                                                             per_page=limit)
@@ -891,9 +912,11 @@ class QueryListStudyTextReportResources(Resource):
 
         response_list = list(map(lambda x: x.to_dict(), list_study_text_result))
         df: pd.DataFrame = pd.json_normalize(response_list)
+        df['impression_str'] = df['text'].map(self.get_impression_str)
         columns = df.columns.to_list()
         group_key = get_group_key_by_series(columns)
         group_key['general_keys'].append('text')
+        group_key['general_keys'].append('impression_str')
         jsonify_result = {'code': 2000,
                           'key': columns,
                           'data': {"total": total,

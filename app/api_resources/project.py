@@ -78,12 +78,11 @@ class ProjectsResources(Resource):
         project_model = ProjectModel.query.filter_by(name=name).first()
         print(project_model)
         if not project_model:
-
             project_model = ProjectModel()
             project_model.name = name
-            db.s3_session.add(project_model)
-            db.s3_session.commit()
-            db.s3_session.refresh(project_model)
+            db.session.add(project_model)
+            db.session.commit()
+            db.session.refresh(project_model)
             # db.relationship()
             return {'data': project_model.to_dict()}, 201
         else:

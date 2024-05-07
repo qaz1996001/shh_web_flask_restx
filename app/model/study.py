@@ -20,6 +20,8 @@ class StudyModel(db.Model):
     study_description : Mapped[str]       = mapped_column(String)
     accession_number  : Mapped[str]       = mapped_column(String, index=True)
     series            : Mapped[List["SeriesModel"]] = relationship(back_populates="study")
+
+    text              : Mapped[List["TextReportModel"]] = relationship(back_populates="study")
     orthanc_study_ID  : Mapped[str]       = mapped_column(String, nullable=True)
     created_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
@@ -44,10 +46,11 @@ class StudyModel(db.Model):
 class TextReportModel(db.Model):
     __tablename__ = 'text_report'
     uid              : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    study_uid        : Mapped[Uuid]      = mapped_column(Uuid, nullable=True, index=True)
+    study_uid        : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('study.uid'), index=True)
     accession_number : Mapped[str]       = mapped_column(String, index=True)
     text             : Mapped[str]       = mapped_column(String)
     is_success       : Mapped[int]       = mapped_column(Integer, index=True)
+    study            : Mapped["StudyModel"] = relationship(back_populates='text', uselist=False)
     created_at       : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at       : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     deleted_at       : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)

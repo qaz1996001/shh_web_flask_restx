@@ -7,7 +7,7 @@ import time
 import uuid
 from typing import List
 import pandas as pd
-from sqlalchemy.sql.expression import func,distinct
+from sqlalchemy.sql.expression import func, distinct
 
 from flask import jsonify, request
 from .base import UidFields, CountFields
@@ -131,7 +131,6 @@ class PageSchema(ma.Schema):
     sort = mafields.String(default='-uid')
 
 
-
 class StudySchema(PageSchema):
     accession_number = mafields.String(default='')
     patient_id = mafields.String(default='')
@@ -159,7 +158,7 @@ def get_page_limit_sort(request):
 class QueryResources(Resource):
     def get(self, ):
         query = PatientModel.query
-        patient_model:PatientModel = query.first()
+        patient_model: PatientModel = query.first()
         print(patient_model.study)
         print(patient_model.study[0].series)
         for series in patient_model.study[0].series:
@@ -180,10 +179,10 @@ class QueryPatientResources(Resource):
         # page_result = page_schema.dump(request.args, many=False)
         # page = page_result['page']
         # limit = page_result['limit']
-        page,limit,sort = get_page_limit_sort(request=request)
+        page, limit, sort = get_page_limit_sort(request=request)
 
         order_by = sort[0]
-        sort     = sort[1:]
+        sort = sort[1:]
         sort_column = getattr(PatientModel, sort)
         if order_by == '+':
             sort_column = sort_column.asc()
@@ -229,10 +228,10 @@ class QueryStudyResources(Resource):
         #     sort_column = sort_column.desc()
 
         # query = db.select(StudyModel).order_by(sort_column)
-        query            = db.select(StudyModel)
-        paginate         = db.paginate(query,page=page,per_page=limit)
+        query = db.select(StudyModel)
+        paginate = db.paginate(query, page=page, per_page=limit)
         study_query_list = paginate.items
-        total            = paginate.total
+        total = paginate.total
         # patient_uid_cache = dict()
         response_list = []
         for study_model in study_query_list:
@@ -260,7 +259,7 @@ class QueryStudyResources(Resource):
                              columns=['series_description'],
                              values=['series_uid'],
                              aggfunc='count', fill_value=0)
-        print(order_by,sort,page,limit)
+        print(order_by, sort, page, limit)
 
         df1.columns = df1.columns.get_level_values('series_description')
         df1.reset_index(inplace=True)
@@ -302,18 +301,17 @@ class QuerySeriesResources(Resource):
     def get_series_dict_list_by_series_model_list(self, series_model_list: List[PatientModel]):
         response_list = []
         for series_model in series_model_list:
-
-            study       = series_model.study
-            study_dict  = study.to_dict()
+            study = series_model.study
+            study_dict = study.to_dict()
             age = self.study_resources.get_age_by_study_date(study.patient.birth_date,
                                                              study.study_date)
             series_dict = series_model.to_dict()
-            series_dict['study_uid']         = study.uid
-            series_dict['patient_id']        = study.patient.patient_id
-            series_dict['gender']            = study.patient.gender
-            series_dict['age']               = age
-            series_dict['study_date']        = study_dict['study_date']
-            series_dict['accession_number']  = study_dict['accession_number']
+            series_dict['study_uid'] = study.uid
+            series_dict['patient_id'] = study.patient.patient_id
+            series_dict['gender'] = study.patient.gender
+            series_dict['age'] = age
+            series_dict['study_date'] = study_dict['study_date']
+            series_dict['accession_number'] = study_dict['accession_number']
             series_dict['study_description'] = study_dict['study_description']
             response_list.append(series_dict)
         return response_list
@@ -371,7 +369,7 @@ class QueryListProjectSeriesResources(Resource):
                 db.select(distinct(SeriesModel.study_uid)).join(ProjectSeriesModel,
                                                                 SeriesModel.uid == ProjectSeriesModel.series_uid) \
                     .filter(ProjectSeriesModel.projects_uid == project_uid)))
-                    .order_by(StudyModel.accession_number.desc()))
+                     .order_by(StudyModel.accession_number.desc()))
             paginate = db.paginate(query, page=page, per_page=limit)
             project_study_model_list = paginate.items
             total = paginate.total
@@ -401,15 +399,14 @@ class QueryListProjectSeriesResources(Resource):
                 start = time.time()
                 query = db.select(StudyModel).filter(StudyModel.uid.in_(
                     db.select(distinct(SeriesModel.study_uid)).join(ProjectSeriesModel,
-                                                          SeriesModel.uid == ProjectSeriesModel.series_uid) \
-                      .filter(ProjectSeriesModel.projects_uid == project_model.uid)
+                                                                    SeriesModel.uid == ProjectSeriesModel.series_uid) \
+                        .filter(ProjectSeriesModel.projects_uid == project_model.uid)
                 )).order_by(StudyModel.accession_number.desc())
                 paginate = db.paginate(query,
-                                       page=page,per_page=limit)
-
+                                       page=page, per_page=limit)
 
                 project_study_model_list = paginate.items
-                total                    = paginate.total + total
+                total = paginate.total + total
                 for study_model in project_study_model_list:
                     series_dict_list = list(map(lambda series_model: series_model.to_dict(),
                                                 study_model.series))
@@ -417,10 +414,10 @@ class QueryListProjectSeriesResources(Resource):
                         study_dict = study_model.to_dict()
                         age = self.study_resources.get_age_by_study_date(study_model.patient.birth_date,
                                                                          study_model.study_date)
-                        series_dict['study_uid']  = study_dict['uid']
+                        series_dict['study_uid'] = study_dict['uid']
                         series_dict['patient_id'] = study_model.patient.patient_id
-                        series_dict['gender']     = study_model.patient.gender
-                        series_dict['age']        = age
+                        series_dict['gender'] = study_model.patient.gender
+                        series_dict['age'] = age
                         series_dict['study_date'] = study_dict['study_date']
                         series_dict['accession_number'] = study_dict['accession_number']
                         series_dict['study_description'] = study_dict['study_description']
@@ -471,7 +468,7 @@ class QueryListProjectSeriesResources(Resource):
         df = pd.json_normalize(result)
         # print(df.columns)
         jsonify_result = {
-                          'data': df.to_dict()}
+            'data': df.to_dict()}
         return jsonify_result
 
     def add_project_info(self, project_model: ProjectModel,
@@ -484,9 +481,9 @@ class QueryListProjectSeriesResources(Resource):
 @query_ns.route('/list_study_text_report')
 @query_ns.route('/list_study_text_report/<study_uid_str>')
 class QueryListStudyTextReportResources(Resource):
-    query_study_resources = QueryStudyResources()
+    study_resources = StudyResources()
 
-    @query_ns.marshal_with(query_list_study_text_report)
+    #@query_ns.marshal_with(query_list_study_text_report)
     def get(self, study_uid_str=None):
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 20))
@@ -507,47 +504,32 @@ class QueryListStudyTextReportResources(Resource):
             result = query_ns.marshal(study_dict, query_list_study_text_report)
             total = 1
         else:
-            if miss:
-                query = db.select(StudyModel) \
-                    .join(TextReportModel, StudyModel.uid == TextReportModel.study_uid,
-                          isouter=True) \
-                    .order_by(StudyModel.study_date.asc())
-                paginate = db.paginate(query, page=page, per_page=limit)
-            else:
-                query = db.select(StudyModel) \
-                    .join(TextReportModel, StudyModel.uid == TextReportModel.study_uid,
-                          isouter=True) \
-                    .filter(func.char_length(TextReportModel.text) > 0) \
-                    .order_by(StudyModel.study_date.asc())
-
+            query = db.select(TextReportModel) \
+                      .join(StudyModel, TextReportModel.study_uid == StudyModel.uid,
+                            isouter=True) \
+                      .filter(func.char_length(TextReportModel.text) > 0) \
+                      .order_by(StudyModel.study_date.asc())
             paginate = db.paginate(query, page=page, per_page=limit)
-            study_query = paginate.items
+            text_report_list = paginate.items
             total = paginate.total
-
-            study_uid_list = list(map(lambda x: x.uid, study_query))
-            study_text_report_dict_query = db.s3_session.execute(db.select(StudyModel, TextReportModel)
-                                                                 .filter(StudyModel.uid.in_(study_uid_list))
-                                                                 .join(TextReportModel,
-                                                                    StudyModel.uid == TextReportModel.study_uid,
-                                                                    isouter=True)
-                                                                 .order_by(StudyModel.study_date.asc())).all()
             study_text_report_dict_list = []
-            for i in range(len(study_text_report_dict_query)):
-                study_dict = self.query_study_resources.study_resources.get_patient_info_by_study(
-                    study_text_report_dict_query[i][0])
-                if study_text_report_dict_query[i][1]:
-                    text = study_text_report_dict_query[i][1].text
-                else:
-                    text = 'Na'
-                study_dict['text'] = text
+            for text_report_model in text_report_list:
+                study_model :StudyModel = text_report_model.study
+                study_dict = study_model.to_dict()
+                age = self.study_resources.get_age_by_study_date(study_model.patient.birth_date,
+                                                                 study_model.study_date)
+                study_dict['text'] = text_report_model.text
+                study_dict['patient_id'] = study_model.patient.patient_id
+                study_dict['gender']     = study_model.patient.gender
+                study_dict['age']        = age
+
                 study_text_report_dict_list.append(study_dict)
 
             result = query_ns.marshal(study_text_report_dict_list,
                                       query_list_study_text_report_items_1)
-            # query_list_patient_items_1
         df = pd.json_normalize(result)
         jsonify_result = {'code': 2000,
                           'key': list(query_list_study_text_report_items.keys()),
                           'data': {"total": total,
                                    "items": df.to_dict(orient='records')}}
-        return jsonify_result
+        return jsonify(jsonify_result)
