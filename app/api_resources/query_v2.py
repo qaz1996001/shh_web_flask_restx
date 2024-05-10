@@ -8,11 +8,12 @@ from flask_restx import Resource, fields, Namespace
 import uuid
 import pandas as pd
 from sqlalchemy import and_
+from sqlalchemy.sql.expression import func
 from sqlalchemy_filters import apply_filters
 from flask import jsonify, request
 from .base import UidFields
 from ..model import ListStudyTextReportModel, ListStudyModel, ListPatientModel, ListProjectStudyModel, ProjectModel, \
-    TextReportModel, SeriesModel, PatientModel, StudyModel
+    TextReportModel, SeriesModel, PatientModel, StudyModel, TextReportRawModel
 from flask_marshmallow.fields import fields as mafields
 from .. import db, ma
 
@@ -592,8 +593,8 @@ class QueryStudyResources(Resource):
         query = ListStudyModel.query
         filter_ = get_query_filter(request=request)
         if filter_:
-            series_description_filter = list(lambda x: x['field'] == 'series_description', filter_)
-            orther_filter = list(lambda x: x['field'] != 'series_description', filter_)
+            series_description_filter = list(filter(lambda x: x['field'] == 'series_description', filter_))
+            orther_filter = list(filter(lambda x: x['field'] != 'series_description', filter_))
             filtered_query = apply_filters(query, orther_filter)
             paginate = (filtered_query.filter(ListStudyModel.
                                               series_description.op("->")(
@@ -675,60 +676,60 @@ class QueryStudyResources(Resource):
 # @query_ns.param('page', type=int)
 # @query_ns.param('limit', type=int)
 # @query_ns.param('sort', type=str)
-class QuerySeriesResources(Resource):
-    @query_ns.marshal_with(query_list_series)
-    def get(self, ):
-        page = int(request.args.get('page', 1))
-        limit = int(request.args.get('limit', 20))
-        sort = request.args.get('sort', '-patients_id')
-        paginate = db.paginate(
-            db.select(SeriesModel).order_by(SeriesModel.series_date.asc()),
-            page=page,
-            per_page=limit
-        )
-        series_model_list = paginate.items
-        response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
-        result = query_ns.marshal(response_list,
-                                  query_list_series_items)
-        df = pd.json_normalize(result)
-        jsonify_result = {'code': 2000,
-                          'key': df.columns.to_list(),
-                          'data': {"total": paginate.total,
-                                   "items": df.to_dict(orient='records')}}
-        return jsonify_result
-
-    def get_series_dict_list_by_series_model_list(self, series_model_list: List[PatientModel]):
-        response_list = []
-        study_uid_cache = dict()
-        for series_model in series_model_list:
-            study_uid = series_model.study_uid
-            if study_uid in study_uid_cache:
-                study_dict = study_uid_cache[study_uid]
-            else:
-                study_model = StudyModel.query.filter_by(uid=study_uid).first()
-                patient_model = PatientModel.query.filter_by(uid=study_model.patient_uid).first()
-                study_dict = study_model.to_dict()
-                study_dict['patient_id'] = patient_model.patient_id
-                study_dict['gender'] = patient_model.gender
-                study_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=patient_model.birth_date,
-                                                                               study_date=study_model.study_date
-                                                                               )
-                study_uid_cache[study_uid] = study_dict
-            series_dict = series_model.to_dict()
-            series_dict['study_uid'] = study_dict['uid']
-            series_dict['patient_id'] = study_dict['patient_id']
-            series_dict['gender'] = study_dict['gender']
-            series_dict['age'] = study_dict['age']
-            series_dict['study_date'] = study_dict['study_date']
-            series_dict['accession_number'] = study_dict['accession_number']
-            series_dict['study_description'] = study_dict['study_description']
-            response_list.append(series_dict)
-        return response_list
-
-    def get_series_dict_list_by_series_uid_list(self, series_uid_list: List[uuid.UUID]):
-        series_model_list = SeriesModel.query.filter(SeriesModel.uid.in_(series_uid_list)).all()
-        response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
-        return response_list
+# class QuerySeriesResources(Resource):
+#     @query_ns.marshal_with(query_list_series)
+#     def get(self, ):
+#         page = int(request.args.get('page', 1))
+#         limit = int(request.args.get('limit', 20))
+#         sort = request.args.get('sort', '-patients_id')
+#         paginate = db.paginate(
+#             db.select(SeriesModel).order_by(SeriesModel.series_date.asc()),
+#             page=page,
+#             per_page=limit
+#         )
+#         series_model_list = paginate.items
+#         response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
+#         result = query_ns.marshal(response_list,
+#                                   query_list_series_items)
+#         df = pd.json_normalize(result)
+#         jsonify_result = {'code': 2000,
+#                           'key': df.columns.to_list(),
+#                           'data': {"total": paginate.total,
+#                                    "items": df.to_dict(orient='records')}}
+#         return jsonify_result
+#
+#     def get_series_dict_list_by_series_model_list(self, series_model_list: List[PatientModel]):
+#         response_list = []
+#         study_uid_cache = dict()
+#         for series_model in series_model_list:
+#             study_uid = series_model.study_uid
+#             if study_uid in study_uid_cache:
+#                 study_dict = study_uid_cache[study_uid]
+#             else:
+#                 study_model = StudyModel.query.filter_by(uid=study_uid).first()
+#                 patient_model = PatientModel.query.filter_by(uid=study_model.patient_uid).first()
+#                 study_dict = study_model.to_dict()
+#                 study_dict['patient_id'] = patient_model.patient_id
+#                 study_dict['gender'] = patient_model.gender
+#                 study_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=patient_model.birth_date,
+#                                                                                study_date=study_model.study_date
+#                                                                                )
+#                 study_uid_cache[study_uid] = study_dict
+#             series_dict = series_model.to_dict()
+#             series_dict['study_uid'] = study_dict['uid']
+#             series_dict['patient_id'] = study_dict['patient_id']
+#             series_dict['gender'] = study_dict['gender']
+#             series_dict['age'] = study_dict['age']
+#             series_dict['study_date'] = study_dict['study_date']
+#             series_dict['accession_number'] = study_dict['accession_number']
+#             series_dict['study_description'] = study_dict['study_description']
+#             response_list.append(series_dict)
+#         return response_list
+#
+#     def get_series_dict_list_by_series_uid_list(self, series_uid_list: List[uuid.UUID]):
+#         series_model_list = SeriesModel.query.filter(SeriesModel.uid.in_(series_uid_list)).all()
+#         response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
+#         return response_list
 
 
 @query_ns.route('/list_project')
@@ -819,13 +820,13 @@ class QueryListProjectSeriesResources(Resource):
 
         response_list = list(map(lambda x: x.to_dict(), list_project_series_result))
         df: pd.DataFrame = pd.json_normalize(response_list)
-
-        df.columns = list(
+        columns = list(
             map(lambda x: x.replace('series_description.', '') if 'series_description.' in x else x, df.columns))
+        df.columns = columns
 
         df.fillna(0, inplace=True)
         jsonify_result = {'code': 2000,
-                          'key': df.columns.to_list(),
+                          'key': columns,
                           'data': {"total": total,
                                    "items": df.to_dict(orient='records')}}
         return jsonify(jsonify_result)
@@ -924,3 +925,152 @@ class QueryListStudyTextReportResources(Resource):
                           'group_key': group_key,
                           'op_list': filter_op_list}
         return jsonify(jsonify_result)
+
+
+@query_ns.route('/text_report')
+class TextRepostStudyResources(Resource):
+    pattern_impression_str = re.compile(r'(?i:impression\s?:?|imp:?|conclusions?:?)')
+    pattern_depiction = re.compile(r'Summary :\n(.*)(\n.+)醫師', re.DOTALL)
+
+    # @query_ns.marshal_with(query_list_study_text_report)
+    @query_ns.param('page', type=int, default='1')
+    @query_ns.param('limit', type=int, default='20')
+    def get(self):
+        page, limit, sort_column = get_page_limit_sort(request=request, model=TextReportRawModel,
+                                                       default='+accession_number')
+        query = TextReportRawModel.query
+        filter_ = get_query_filter(request=request)
+        if filter_:
+            impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str', filter_))
+            orther_filter = list(filter(lambda x: x['field'] != 'impression_str', filter_))
+            filtered_query = apply_filters(query, orther_filter)
+            paginate = filtered_query.order_by(sort_column).paginate(page=page,
+                                                                     per_page=limit)
+            print(filtered_query)
+        else:
+            paginate = (query.order_by(sort_column)
+                        .filter(func.char_length(TextReportRawModel.text) > 0)
+                        .paginate(page=page, per_page=limit))
+        text_report_result = paginate.items
+        response_list = list(map(lambda x: x.to_dict(), text_report_result))
+        total = paginate.total
+        df: pd.DataFrame = pd.json_normalize(response_list)
+        df['impression_str'] = df['text'].map(self.get_impression_str)
+        columns = df.columns.to_list()
+        group_key = get_group_key_by_series(columns)
+        group_key['general_keys'].append('text')
+        group_key['general_keys'].append('impression_str')
+        jsonify_result = {'code': 2000,
+                          'key': columns,
+                          'data': {"total": total,
+                                   "items": df.to_dict(orient='records')},
+                          'group_key': group_key,
+                          'op_list': filter_op_list}
+        return jsonify(jsonify_result)
+
+    @query_ns.param('page', type=int, default='1')
+    @query_ns.param('limit', type=int, default='20')
+    def post(self):
+        page, limit, sort_column = get_page_limit_sort(request=request, model=TextReportRawModel,
+                                                       default='+accession_number')
+        # query = TextReportRawModel.query
+        # filter_ = filter_schema.dump(request.json['filter_'], many=True)
+        # if filter_:
+        #     impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str',filter_))
+        #     orther_filter = list(filter(lambda x: x['field'] != 'impression_str',filter_))
+        #     orther_filter = list(map(self.op_like_add_percent, orther_filter))
+        #     print(orther_filter)
+        #     filtered_query = apply_filters(query, orther_filter)
+        #     paginate = filtered_query.order_by(sort_column).paginate(page=page,
+        #                                                              per_page=limit)
+        #     print(filtered_query)
+        # else:
+        #     paginate = (query.order_by(sort_column)
+        #                 .filter(func.char_length(TextReportRawModel.text) > 0)
+        #                 .paginate(page=page, per_page=limit))
+
+
+        filter_ = filter_schema.dump(request.json['filter_'], many=True)
+        if filter_:
+            impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str',filter_))
+            orther_filter = list(filter(lambda x: x['field'] != 'impression_str',filter_))
+            orther_filter = list(map(self.op_like_add_percent, orther_filter))
+            print(orther_filter)
+            query = apply_filters(TextReportRawModel.query, orther_filter)
+            print(query)
+        else:
+            impression_str_filter = None
+            query = TextReportRawModel.query
+        paginate = (query.order_by(sort_column)
+                    .filter(func.char_length(TextReportRawModel.text) > 0)
+                    .paginate(page=page, per_page=limit))
+
+        text_report_result = paginate.items
+        response_list = list(map(lambda x: x.to_dict(), text_report_result))
+        total = paginate.total
+        df: pd.DataFrame = pd.json_normalize(response_list)
+        # df['impression_str'] = df['text'].map(self.get_impression_str)
+        df['impression_str'] = df['text'].map(self.get_impression_str)
+        print(impression_str_filter)
+        if impression_str_filter:
+            temp_list = []
+            for i in impression_str_filter:
+                temp_list.append(df['impression_str'].str.contains(i['value']))
+            temp_df = pd.DataFrame(temp_list).T
+            print(temp_df)
+            df_filter = df[temp_df.all(axis=1)]
+            print(df_filter)
+            # for i in impression_str_filter:
+            #     temp_list.append(f"impression_str.str.contains('{i['value']}')")
+            #
+            # query_str = ' and '.join(temp_list)
+            # print(query_str)
+            # df_filter = df.query(query_str)
+        else:
+            df_filter = df
+        columns = df_filter.columns.to_list()
+        group_key = get_group_key_by_series(columns)
+        group_key['general_keys'].append('text')
+        group_key['general_keys'].append('impression_str')
+        jsonify_result = {'code': 2000,
+                          'key': columns,
+                          'data': {"total": total,
+                                   "items": df_filter.to_dict(orient='records')},
+                          'group_key': group_key,
+                          'op_list': filter_op_list}
+        return jsonify(jsonify_result)
+
+        # columns = df.columns.to_list()
+        # group_key = get_group_key_by_series(columns)
+        # group_key['general_keys'].append('text')
+        # group_key['general_keys'].append('impression_str')
+        # jsonify_result = {'code': 2000,
+        #                   'key': columns,
+        #                   'data': {"total": total,
+        #                            "items": df.to_dict(orient='records')},
+        #                   'group_key': group_key,
+        #                   'op_list': filter_op_list}
+        # return jsonify(jsonify_result)
+    def delete(self):
+        return 'TextRepostStudyResources'
+
+
+    def get_impression_str(self, x):
+        # result_impression_str = pattern_impression_str.search(x)
+        depiction_match = self.pattern_depiction.search(x)
+        if depiction_match:
+            depiction = depiction_match.group(1)
+            result_impression_str = self.pattern_impression_str.split(depiction)
+            if len(result_impression_str) > 0:
+                return result_impression_str[-1]
+            else:
+                return ''
+        return ''
+
+    def op_like_add_percent(self,x):
+        if x['op'] == 'like':
+            if x['value'].startswith('%') or x['value'].endswith('%'):
+                pass
+            else:
+                x['value'] = rf"%{x['value']}%"
+        return x

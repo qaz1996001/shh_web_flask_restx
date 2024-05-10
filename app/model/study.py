@@ -14,7 +14,7 @@ class StudyModel(db.Model):
     uid               : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
     # patient_uid       : Mapped[Uuid]      = mapped_column(Uuid, index=True)
     patient_uid       : Mapped[Uuid]         = mapped_column(Uuid,ForeignKey('patient.uid'), index=True)
-    patient           : Mapped["PaetientModel"] = relationship(back_populates='study', uselist=False)
+    patient           : Mapped["PatientModel"] = relationship(back_populates='study', uselist=False)
     study_date        : Mapped[Date]      = mapped_column(Date, index=True)
     study_time        : Mapped[Time]      = mapped_column(Time)
     study_description : Mapped[str]       = mapped_column(String)
@@ -81,9 +81,8 @@ class TextReportRawModel(db.Model):
     def to_dict(self):
         dict_ = {
             'uid': self.uid.hex,
-            'study_uid': self.patient_uid.hex,
-            'text': self.patient_uid.hex,
-            'is_success': self.patient_uid.hex,
+            'accession_number': self.accession_number,
+            'text': self.text,
             'created_at': str(self.created_at),
             'updated_at': str(self.updated_at),
             'deleted_at': str(self.deleted_at),
