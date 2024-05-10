@@ -14,7 +14,7 @@ class StudyModel(db.Model):
     uid               : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
     # patient_uid       : Mapped[Uuid]      = mapped_column(Uuid, index=True)
     patient_uid       : Mapped[Uuid]         = mapped_column(Uuid,ForeignKey('patient.uid'), index=True)
-    patient           : Mapped["PatientModel"] = relationship(back_populates='study', uselist=False)
+    patient           : Mapped["PaetientModel"] = relationship(back_populates='study', uselist=False)
     study_date        : Mapped[Date]      = mapped_column(Date, index=True)
     study_time        : Mapped[Time]      = mapped_column(Time)
     study_description : Mapped[str]       = mapped_column(String)
