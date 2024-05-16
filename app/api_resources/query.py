@@ -80,7 +80,7 @@ query_list_series_items = query_ns.model('query_list_series_items', {'patient_id
                                                                      'study_date': fields.String,
                                                                      'study_description': fields.String,
                                                                      'accession_number': fields.String,
-                                                                     'series_uid': UidFields(attribute='uid'),
+                                                                     'series_uid': UidFields(attribute='series_uid'),
                                                                      'series_description': fields.String,
                                                                      'modality': fields.String, })
 
@@ -292,13 +292,14 @@ class QuerySeriesResources(Resource):
         result = query_ns.marshal(response_list,
                                   query_list_series_items)
         df = pd.json_normalize(result)
+        print(df.shape)
         jsonify_result = {'code': 2000,
                           'key': df.columns.to_list(),
                           'data': {"total": paginate.total,
                                    "items": df.to_dict(orient='records')}}
         return jsonify_result
 
-    def get_series_dict_list_by_series_model_list(self, series_model_list: List[PatientModel]):
+    def get_series_dict_list_by_series_model_list(self, series_model_list: List[SeriesModel]):
         response_list = []
         for series_model in series_model_list:
             study = series_model.study
@@ -306,6 +307,7 @@ class QuerySeriesResources(Resource):
             age = self.study_resources.get_age_by_study_date(study.patient.birth_date,
                                                              study.study_date)
             series_dict = series_model.to_dict()
+            series_dict['series_uid'] = series_model.uid
             series_dict['study_uid'] = study.uid
             series_dict['patient_id'] = study.patient.patient_id
             series_dict['gender'] = study.patient.gender

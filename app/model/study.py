@@ -22,6 +22,8 @@ class StudyModel(db.Model):
     series            : Mapped[List["SeriesModel"]] = relationship(back_populates="study")
 
     text              : Mapped[List["TextReportModel"]] = relationship(back_populates="study")
+    project           : Mapped[List["ProjectModel"]] = relationship(secondary="project_study",
+                                                                    back_populates="study")
     orthanc_study_ID  : Mapped[str]       = mapped_column(String, nullable=True)
     created_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)

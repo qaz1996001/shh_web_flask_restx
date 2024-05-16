@@ -3,6 +3,7 @@ import datetime
 import re
 from typing import List
 
+import flask_sqlalchemy.query
 import orjson
 from flask_restx import Resource, fields, Namespace
 import uuid
@@ -77,6 +78,17 @@ query_list_project_series = query_ns.model('query_list_project_series_get',
                                             'modality': fields.String,
                                             'series_description': fields.String,
                                             })
+# filter_list_project_series.default = """
+#   [{
+#     "field":"age",
+#     "op":"ge",
+#     "value":"0"},
+#     {
+#     "field":"series_description",
+#     "op":"like",
+#     "value":"%ADC%"}
+#   ]
+# """
 
 ########## list_project_series ########################
 
@@ -395,16 +407,56 @@ filter_list_study_text_report.default = """
 query_filter_list_study_text_report = query_ns.model('query_filter_list_study_text_report',
                                                      {"filter_": filter_list_study_text_report, })
 
-filter_op_list = [#'is_null',
-                  'is_not_null',
-                  '==', '!=',
-                  '>', '<',
-                  '>=', '<=',
-                  'like',
-                  #'ilike', 'not_ilike',
-                  'in', #'not_in',
-                  #'any', 'not_any'
-                  ]
+filter_op_list = [  #'is_null',
+    'like',
+    '==',
+    '>', '<',
+    '>=', '<=', '!=',
+    'regexp',
+    'is_not_null', 'in',  #'not_in',
+    #'ilike', 'not_ilike',
+
+    #'any', 'not_any'
+]
+
+
+# use map
+def op_like_add_percent(x):
+    if x['op'] == 'like':
+        if x['value'].startswith('%') or x['value'].endswith('%'):
+            pass
+        else:
+            x['value'] = rf"%{x['value']}%"
+    return x
+
+
+# use filter
+def get_orther_filter(x):
+    if (x['field'] != 'impression_str') and (x['op'] != 'regexp'):
+        return True
+    elif x['op'] == 'regexp':
+        return False
+    elif x['field'] == 'impression_str':
+        return False
+    return True
+
+
+# use filter
+# def get_impression_str_filter(x):
+#     return []
+
+def get_regexp_filter(x):
+    if x['op'] == 'regexp':
+        return True
+    return False
+
+
+def get_regexp(regexp_filter_list, model):
+    regexp_list = []
+    for i in regexp_filter_list:
+        column = getattr(model, i['field'])
+        regexp_list.append(column.regexp_match(i['value'],flags = 'i'))
+    return regexp_list
 
 
 ########## query_filter( ##############################
@@ -425,9 +477,11 @@ class QueryResources(Resource):
         paginate = db.paginate(
             db.select(ListStudyTextReportModel).where(ListStudyTextReportModel.text.regexp_match('\dmm')),
             page=1,
-            per_page=20
+            per_page=100
         )
         patient_model_list = paginate.items
+        print('patient_model_list')
+        print(len(patient_model_list))
         total = paginate.total
         result = query_ns.marshal(patient_model_list, query_list_study_text_report_items)
         group_key = get_group_key_by_series(query_list_patient_items.keys())
@@ -440,6 +494,13 @@ class QueryResources(Resource):
         return jsonify(jsonify_result)
         # return 'QueryResources V2'
 
+    def post(self, ):
+        series_model:SeriesModel = db.session.execute(
+            db.select(SeriesModel).where(SeriesModel.uid=='eb6509c7-9074-4e1e-971a-f9b3e81040de')
+        ).scalar()
+        print(series_model.project[0].name)
+        print(series_model.project[1].name)
+        return 'QueryResources'
     def list_patient_table(self):
         pass
 
@@ -672,66 +733,6 @@ class QueryStudyResources(Resource):
         return list_study_model_dict
 
 
-# @query_ns.route('/list_series')
-# @query_ns.param('page', type=int)
-# @query_ns.param('limit', type=int)
-# @query_ns.param('sort', type=str)
-# class QuerySeriesResources(Resource):
-#     @query_ns.marshal_with(query_list_series)
-#     def get(self, ):
-#         page = int(request.args.get('page', 1))
-#         limit = int(request.args.get('limit', 20))
-#         sort = request.args.get('sort', '-patients_id')
-#         paginate = db.paginate(
-#             db.select(SeriesModel).order_by(SeriesModel.series_date.asc()),
-#             page=page,
-#             per_page=limit
-#         )
-#         series_model_list = paginate.items
-#         response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
-#         result = query_ns.marshal(response_list,
-#                                   query_list_series_items)
-#         df = pd.json_normalize(result)
-#         jsonify_result = {'code': 2000,
-#                           'key': df.columns.to_list(),
-#                           'data': {"total": paginate.total,
-#                                    "items": df.to_dict(orient='records')}}
-#         return jsonify_result
-#
-#     def get_series_dict_list_by_series_model_list(self, series_model_list: List[PatientModel]):
-#         response_list = []
-#         study_uid_cache = dict()
-#         for series_model in series_model_list:
-#             study_uid = series_model.study_uid
-#             if study_uid in study_uid_cache:
-#                 study_dict = study_uid_cache[study_uid]
-#             else:
-#                 study_model = StudyModel.query.filter_by(uid=study_uid).first()
-#                 patient_model = PatientModel.query.filter_by(uid=study_model.patient_uid).first()
-#                 study_dict = study_model.to_dict()
-#                 study_dict['patient_id'] = patient_model.patient_id
-#                 study_dict['gender'] = patient_model.gender
-#                 study_dict['age'] = self.study_resources.get_age_by_study_date(birth_date=patient_model.birth_date,
-#                                                                                study_date=study_model.study_date
-#                                                                                )
-#                 study_uid_cache[study_uid] = study_dict
-#             series_dict = series_model.to_dict()
-#             series_dict['study_uid'] = study_dict['uid']
-#             series_dict['patient_id'] = study_dict['patient_id']
-#             series_dict['gender'] = study_dict['gender']
-#             series_dict['age'] = study_dict['age']
-#             series_dict['study_date'] = study_dict['study_date']
-#             series_dict['accession_number'] = study_dict['accession_number']
-#             series_dict['study_description'] = study_dict['study_description']
-#             response_list.append(series_dict)
-#         return response_list
-#
-#     def get_series_dict_list_by_series_uid_list(self, series_uid_list: List[uuid.UUID]):
-#         series_model_list = SeriesModel.query.filter(SeriesModel.uid.in_(series_uid_list)).all()
-#         response_list = self.get_series_dict_list_by_series_model_list(series_model_list=series_model_list)
-#         return response_list
-
-
 @query_ns.route('/list_project')
 @query_ns.param('page', type=int, default=1)
 @query_ns.param('limit', type=int, default=20)
@@ -762,9 +763,6 @@ class QueryListProjectResources(Resource):
 
 
 @query_ns.route('/list_project_series')
-@query_ns.param('page', type=int, default=1)
-@query_ns.param('limit', type=int, default=20)
-@query_ns.param('sort', type=str, default='+uid')
 class QueryListProjectSeriesResources(Resource):
     def get(self):
         page, limit, sort_column = get_page_limit_sort(request=request, model=ListProjectStudyModel, default='+uid')
@@ -778,7 +776,6 @@ class QueryListProjectSeriesResources(Resource):
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
                                                             per_page=limit)
-
         list_project_series_result = paginate.items
         total = paginate.total
 
@@ -799,6 +796,9 @@ class QueryListProjectSeriesResources(Resource):
                           }
         return jsonify(jsonify_result)
 
+    @query_ns.param('page', type=int, default=1)
+    @query_ns.param('limit', type=int, default=20)
+    @query_ns.param('sort', type=str, default='+project_name')
     @query_ns.expect(query_filter_list_project_series)
     def post(self):
         # print(request.args)
@@ -823,19 +823,23 @@ class QueryListProjectSeriesResources(Resource):
         columns = list(
             map(lambda x: x.replace('series_description.', '') if 'series_description.' in x else x, df.columns))
         df.columns = columns
-
+        group_key = get_group_key_by_series(columns)
+        group_key['general_keys'].insert(0, 'project_name')
         df.fillna(0, inplace=True)
         jsonify_result = {'code': 2000,
                           'key': columns,
                           'data': {"total": total,
-                                   "items": df.to_dict(orient='records')}}
+                                   "items": df.to_dict(orient='records')},
+                          'group_key': group_key,
+                          'op_list': filter_op_list}
         return jsonify(jsonify_result)
 
 
 @query_ns.route('/list_study_text_report')
 class QueryListStudyTextReportResources(Resource):
     pattern_impression_str = re.compile(r'(?i:impression\s?:?|imp:?|conclusions?:?)')
-    pattern_depiction      = re.compile(r'Summary :\n(.*)(\n.+)醫師', re.DOTALL)
+    pattern_depiction = re.compile(r'Summary :\n(.*)(\n.+)醫師', re.DOTALL)
+
     # @query_ns.marshal_with(query_list_study_text_report)
     @query_ns.param('page', type=int, default='1')
     @query_ns.param('limit', type=int, default='20')
@@ -846,7 +850,11 @@ class QueryListStudyTextReportResources(Resource):
         query = ListStudyTextReportModel.query
         filter_ = get_query_filter(request=request)
         if filter_:
-            filtered_query = apply_filters(query, filter_)
+            impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str', filter_))
+            orther_filter = list(filter(lambda x: x['field'] != 'impression_str', filter_))
+            orther_filter = list(map(op_like_add_percent, orther_filter))
+            # filtered_query = apply_filters(query, filter_)
+            filtered_query = apply_filters(query, orther_filter)
             paginate = filtered_query.order_by(sort_column).paginate(page=page,
                                                                      per_page=limit)
             print(filtered_query)
@@ -874,19 +882,6 @@ class QueryListStudyTextReportResources(Resource):
         return jsonify(jsonify_result)
 
     # def gtemp(self):
-    def get_impression_str(self,x):
-        # result_impression_str = pattern_impression_str.search(x)
-        depiction_match = self.pattern_depiction.search(x)
-        if depiction_match:
-            depiction = depiction_match.group(1)
-            result_impression_str = self.pattern_impression_str.split(depiction)
-            if len(result_impression_str) > 0:
-                return result_impression_str[-1]
-            else:
-                return ''
-        return ''
-    # df3['impression_str'] = df3['depiction'].map(get_impression_str)
-
     @query_ns.param('page', type=int, default='1')
     @query_ns.param('limit', type=int, default='20')
     @query_ns.param('sort', type=str, default='+study_uid')
@@ -899,18 +894,35 @@ class QueryListStudyTextReportResources(Resource):
         query = ListStudyTextReportModel.query
         filter_ = filter_schema.dump(request.json['filter_'], many=True)
         if filter_:
-            filtered_query = apply_filters(query, filter_)
-
-            paginate = (filtered_query
-                        .filter(ListStudyTextReportModel.is_success == 1)
-                        .order_by(sort_column).paginate(page=page,
-                                                        per_page=limit))
+            impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str', filter_))
+            # orther_filter = list(filter(lambda x: x['field'] != 'impression_str', filter_))
+            orther_filter = list(filter(get_orther_filter, filter_))
+            orther_filter = list(map(op_like_add_percent, orther_filter))
+            regexp_filter = list(filter(get_regexp_filter, filter_))
+            regexp_list = get_regexp(regexp_filter,ListStudyTextReportModel)
+            # regexp_filter = list(
+            #     map(lambda x: and_(ListStudyTextReportModel..op("->>")(x['value']).is_not(None)),
+            #         regexp_filter))
+            print('orther_filter')
+            print(orther_filter)
+            print('regexp_filter')
+            print(regexp_filter)
+            print('regexp_list')
+            print(regexp_list)
+            filtered_query = apply_filters(query, orther_filter)
+            temp_query = filtered_query \
+                        .filter(ListStudyTextReportModel.is_success == 1) \
+                        .filter(*regexp_list) \
+                        .order_by(sort_column)
+            print('temp_query')
+            print(temp_query)
+            print(type(temp_query))
+            paginate = temp_query.paginate(page=page,per_page=limit)
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
                                                             per_page=limit)
         list_study_text_result = paginate.items
         total = paginate.total
-
         response_list = list(map(lambda x: x.to_dict(), list_study_text_result))
         df: pd.DataFrame = pd.json_normalize(response_list)
         df['impression_str'] = df['text'].map(self.get_impression_str)
@@ -925,6 +937,18 @@ class QueryListStudyTextReportResources(Resource):
                           'group_key': group_key,
                           'op_list': filter_op_list}
         return jsonify(jsonify_result)
+
+    def get_impression_str(self, x):
+        # result_impression_str = pattern_impression_str.search(x)
+        depiction_match = self.pattern_depiction.search(x)
+        if depiction_match:
+            depiction = depiction_match.group(1)
+            result_impression_str = self.pattern_impression_str.split(depiction)
+            if len(result_impression_str) > 0:
+                return result_impression_str[-1]
+            else:
+                return ''
+        return ''
 
 
 @query_ns.route('/text_report')
@@ -973,30 +997,25 @@ class TextRepostStudyResources(Resource):
     def post(self):
         page, limit, sort_column = get_page_limit_sort(request=request, model=TextReportRawModel,
                                                        default='+accession_number')
-        # query = TextReportRawModel.query
-        # filter_ = filter_schema.dump(request.json['filter_'], many=True)
-        # if filter_:
-        #     impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str',filter_))
-        #     orther_filter = list(filter(lambda x: x['field'] != 'impression_str',filter_))
-        #     orther_filter = list(map(self.op_like_add_percent, orther_filter))
-        #     print(orther_filter)
-        #     filtered_query = apply_filters(query, orther_filter)
-        #     paginate = filtered_query.order_by(sort_column).paginate(page=page,
-        #                                                              per_page=limit)
-        #     print(filtered_query)
-        # else:
-        #     paginate = (query.order_by(sort_column)
-        #                 .filter(func.char_length(TextReportRawModel.text) > 0)
-        #                 .paginate(page=page, per_page=limit))
-
 
         filter_ = filter_schema.dump(request.json['filter_'], many=True)
         if filter_:
-            impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str',filter_))
-            orther_filter = list(filter(lambda x: x['field'] != 'impression_str',filter_))
-            orther_filter = list(map(self.op_like_add_percent, orther_filter))
-            print(orther_filter)
-            query = apply_filters(TextReportRawModel.query, orther_filter)
+            impression_str_filter = list(filter(lambda x: x['field'] == 'impression_str', filter_))
+            # orther_filter = list(filter(lambda x: x['field'] != 'impression_str', filter_))
+            orther_filter = list(filter(get_orther_filter, filter_))
+            orther_filter = list(map(op_like_add_percent, orther_filter))
+            regexp_filter = list(filter(get_regexp_filter, filter_))
+            regexp_list = get_regexp(regexp_filter, TextReportRawModel)
+            # print('orther_filter')
+            # print(orther_filter)
+            # print('regexp_filter')
+            # print(regexp_filter)
+            # print('regexp_list')
+            # print(regexp_list)
+            filtered_query = apply_filters(TextReportRawModel.query, orther_filter)
+            query = filtered_query \
+                .filter(*regexp_list)
+            print('query')
             print(query)
         else:
             impression_str_filter = None
@@ -1009,23 +1028,14 @@ class TextRepostStudyResources(Resource):
         response_list = list(map(lambda x: x.to_dict(), text_report_result))
         total = paginate.total
         df: pd.DataFrame = pd.json_normalize(response_list)
-        # df['impression_str'] = df['text'].map(self.get_impression_str)
+
         df['impression_str'] = df['text'].map(self.get_impression_str)
-        print(impression_str_filter)
         if impression_str_filter:
             temp_list = []
             for i in impression_str_filter:
                 temp_list.append(df['impression_str'].str.contains(i['value']))
             temp_df = pd.DataFrame(temp_list).T
-            print(temp_df)
             df_filter = df[temp_df.all(axis=1)]
-            print(df_filter)
-            # for i in impression_str_filter:
-            #     temp_list.append(f"impression_str.str.contains('{i['value']}')")
-            #
-            # query_str = ' and '.join(temp_list)
-            # print(query_str)
-            # df_filter = df.query(query_str)
         else:
             df_filter = df
         columns = df_filter.columns.to_list()
@@ -1051,9 +1061,9 @@ class TextRepostStudyResources(Resource):
         #                   'group_key': group_key,
         #                   'op_list': filter_op_list}
         # return jsonify(jsonify_result)
+
     def delete(self):
         return 'TextRepostStudyResources'
-
 
     def get_impression_str(self, x):
         # result_impression_str = pattern_impression_str.search(x)
@@ -1066,11 +1076,3 @@ class TextRepostStudyResources(Resource):
             else:
                 return ''
         return ''
-
-    def op_like_add_percent(self,x):
-        if x['op'] == 'like':
-            if x['value'].startswith('%') or x['value'].endswith('%'):
-                pass
-            else:
-                x['value'] = rf"%{x['value']}%"
-        return x

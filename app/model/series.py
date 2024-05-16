@@ -23,8 +23,8 @@ class SeriesModel(db.Model):
     created_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     deleted_at         : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-    project: Mapped[List["ProjectModel"]] = relationship(secondary="project_series",
-                                                         back_populates="series")
+    project            : Mapped[List["ProjectModel"]] = relationship(secondary="project_series",
+                                                                     back_populates="series")
     def to_dict(self):
         dict_ = {
             'uid'                : self.uid.hex,
