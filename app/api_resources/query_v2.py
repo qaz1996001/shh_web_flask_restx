@@ -1076,3 +1076,43 @@ class TextRepostStudyResources(Resource):
             else:
                 return ''
         return ''
+
+
+@query_ns.route('/list_study/download')
+class QueryStudyDownloadResources(QueryStudyResources):
+    def post(self):
+        # req = request.json
+        # print(req)
+        # return 'QueryStudyDownloadResources'
+        page, limit, sort_column = get_page_limit_sort(request=request, model=ListStudyModel, default='+study_uid')
+        query = ListStudyModel.query
+        filter_ = filter_schema.dump(request.json['filter_'], many=True)
+        if filter_:
+            series_description_filter = list(filter(lambda x: x['field'] == 'series_description', filter_))
+            series_description_filter = list(
+                map(lambda x: and_(ListStudyModel.series_description.op("->>")(x['value']).is_not(None)),
+                    series_description_filter))
+            orther_filter = list(filter(lambda x: x['field'] != 'series_description', filter_))
+            filtered_query = apply_filters(query, orther_filter)
+            paginate = (filtered_query.filter(*series_description_filter))
+        else:
+            paginate = query
+
+        list_study_model_result = db.session.execute(paginate.order_by(sort_column)).all()
+        list_study_model_result = list(map(lambda x:x[0], list_study_model_result))
+        print(list_study_model_result)
+        response_list = list(map(self.get_series_description_json, list_study_model_result))
+        df = pd.json_normalize(response_list)
+        columns = list(
+            map(lambda x: x.replace('series_description.', '') if 'series_description.' in x else x, df.columns))
+        df.columns = columns
+        group_key = get_group_key_by_series(columns)
+        df.fillna(0, inplace=True)
+        jsonify_result = {'code': 2000,
+                          'key': columns,
+                          'data': {"total": df.shape[0],
+                                   "items": df.to_dict(orient='records')},
+                          'group_key': group_key,
+                          'op_list': self.list_study_filter_op_list
+                          }
+        return jsonify(jsonify_result)
