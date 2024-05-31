@@ -133,9 +133,9 @@ class StudyResources(Resource):
             study.study_description = study_description
             study.accession_number = accession_number
             study.created_at = datetime.datetime.now()
-            db.s3_session.add(study)
-            db.s3_session.commit()
-            db.s3_session.refresh(study)
+            db.session.add(study)
+            db.session.commit()
+            db.session.refresh(study)
             return study
         return None
 
@@ -227,8 +227,8 @@ class StudiesResources(Resource):
             study.study_description = study_description
             study.accession_number = accession_number
             study.created_at = datetime.datetime.now()
-            db.s3_session.add(study)
-            db.s3_session.commit()
-            db.s3_session.refresh(study)
+            db.session.add(study)
+            db.session.commit()
+            db.session.refresh(study)
             return study
         return None

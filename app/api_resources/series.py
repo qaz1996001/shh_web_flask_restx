@@ -27,12 +27,12 @@ class SeriesResources(Resource):
         result_list = []
         if data_list:
             for data in data_list:
-                patients_id = data.get('patients_id')
+                patients_id = data.get('patient_id')
                 gender = data.get('gender')
                 birth_date = data.get('birth_date')
-                study_date = data.get('studies_date')
-                study_time = data.get('studies_time')
-                study_description = data.get('studies_description')
+                study_date = data.get('study_date')
+                study_time = data.get('study_time')
+                study_description = data.get('study_description')
                 accession_number = data.get('accession_number')
                 series_date = data.get('series_date')
                 series_time = data.get('series_time')
@@ -77,7 +77,7 @@ class SeriesResources(Resource):
         study_date = study.study_date.strftime("%Y%m%d")
         data_dict = series.to_dict()
         data_dict['age'] = age
-        data_dict['patients_id'] = patient.patients_id
+        data_dict['patient_id'] = patient.patient_id
         data_dict['gender'] = patient.gender
         data_dict['study_date'] = study.study_date
         data_dict['study_description'] = study.study_description
@@ -110,9 +110,9 @@ class SeriesResources(Resource):
             series.series_description = series_description
             series.modality = modality
             series.created_at = datetime.datetime.now()
-            db.s3_session.add(series)
-            db.s3_session.commit()
-            db.s3_session.refresh(series)
+            db.session.add(series)
+            db.session.commit()
+            db.session.refresh(series)
             return series
         return None
 

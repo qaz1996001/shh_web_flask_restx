@@ -9,7 +9,7 @@ from . import gen_id
 class FileModel(db.Model):
     __tablename__ = 'file'
     uid           : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    series_uid    : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('series.uid'), nullable=True)
+    content_uid   : Mapped[Uuid]      = mapped_column(Uuid,nullable=True)
     file_name     : Mapped[str]       = mapped_column(String, default='')
     file_size     : Mapped[int]       = mapped_column(Integer)
     file_datetime : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP)

@@ -9,6 +9,10 @@ from . import gen_id
 
 
 class PatientModel(db.Model):
+
+    def __repr__(self):
+        return f'<PatientModel {self.patient_id}>'
+
     __tablename__ = 'patient'
     uid                 : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
     patient_id          : Mapped[str]       = mapped_column(String,index=True)

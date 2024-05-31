@@ -2,6 +2,7 @@ import datetime
 from typing import List
 
 from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP, Date, Time,Uuid,ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .. import db
@@ -21,6 +22,7 @@ class ProjectModel(db.Model):
                                                                     back_populates="project")
     study              : Mapped[List["StudyModel"]] = relationship(secondary="project_study",
                                                                    back_populates="project")
+    project_associations : Mapped[List["ProjectStudyModel"]] = relationship(back_populates="project")
     def to_dict(self):
         dict_ = {
             'uid'                : self.uid.hex,
@@ -32,31 +34,15 @@ class ProjectModel(db.Model):
         return dict_
 
 
-# class ProjectStudyExtraModel(db.Model):
-#     __tablename__ = 'project_study_extra_data'
-#     uid          : Mapped[Uuid]  = mapped_column(Uuid, default=gen_id, primary_key=True)
-#     study_uid    : Mapped[Uuid]  = mapped_column(Uuid,index=True)
-#     project_uid : Mapped[Uuid]  = mapped_column(Uuid,index=True)
-#     text         : Mapped[str]   = mapped_column(String)
-#
-#     def to_dict(self):
-#         dict_ = {
-#             'uid'          : self.uid.hex,
-#             'study_uid'    : self.study_uid.hex,
-#             'project_uid' : self.project_uid.hex,
-#             'text'         : self.text,
-#         }
-#         return dict_
-
-
 class ProjectSeriesModel(db.Model):
     __tablename__ = 'project_series'
-    uid          : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    series_uid   : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('series.uid'),index=True)
+    uid         : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
+    series_uid  : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('series.uid'),index=True)
     project_uid : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('project.uid'),index=True)
-    created_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-    updated_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-    deleted_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
+    extra_data  : Mapped[JSONB]      = mapped_column(JSONB)
+    created_at  : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
+    updated_at  : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
+    deleted_at  : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     # series: Mapped[List["SeriesModel"]] = relationship(back_populates="study")
 
     def to_dict(self):
@@ -74,13 +60,21 @@ class ProjectSeriesModel(db.Model):
 
 class ProjectStudyModel(db.Model):
     __tablename__ = 'project_study'
-    uid          : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
-    study_uid    : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('study.uid'),index=True)
-    project_uid  : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('project.uid'),index=True)
-    created_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-    updated_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-    deleted_at   : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
-    # series: Mapped[List["SeriesModel"]] = relationship(back_populates="study")
+    uid         : Mapped[Uuid]      = mapped_column(Uuid, default=gen_id, primary_key=True)
+    study_uid   : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('study.uid'),index=True)
+    project_uid : Mapped[Uuid]      = mapped_column(Uuid,ForeignKey('project.uid'),index=True)
+    extra_data  : Mapped[JSONB]      = mapped_column(JSONB)
+    created_at  : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
+    updated_at  : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
+    deleted_at  : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
+
+    # project : Mapped["ProjectModel"] = relationship()
+    # study   : Mapped["StudyModel"]   = relationship(back_populates="study")
+    project : Mapped["ProjectModel"] = relationship(back_populates="project_associations")
+    study   : Mapped["StudyModel"]   = relationship(back_populates="project_associations")
+
+    def __repr__(self):
+        return f"<ProjectStudyModel(uid={self.uid},study={self.study.study_description})>"
 
     def to_dict(self):
         dict_ = {

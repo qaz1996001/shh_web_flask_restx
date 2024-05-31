@@ -455,7 +455,7 @@ def get_regexp(regexp_filter_list, model):
     regexp_list = []
     for i in regexp_filter_list:
         column = getattr(model, i['field'])
-        regexp_list.append(column.regexp_match(i['value'],flags = 'i'))
+        regexp_list.append(column.regexp_match(i['value'], flags='i'))
     return regexp_list
 
 
@@ -495,12 +495,13 @@ class QueryResources(Resource):
         # return 'QueryResources V2'
 
     def post(self, ):
-        series_model:SeriesModel = db.session.execute(
-            db.select(SeriesModel).where(SeriesModel.uid=='eb6509c7-9074-4e1e-971a-f9b3e81040de')
+        series_model: SeriesModel = db.session.execute(
+            db.select(SeriesModel).where(SeriesModel.uid == 'eb6509c7-9074-4e1e-971a-f9b3e81040de')
         ).scalar()
         print(series_model.project[0].name)
         print(series_model.project[1].name)
         return 'QueryResources'
+
     def list_patient_table(self):
         pass
 
@@ -534,7 +535,7 @@ class QueryResources(Resource):
         db_df[['study_date', 'study_time']] = db_df[['study_date', 'study_time']].astype(str)
 
         db_df['study_time'] = db_df['study_time'].map(lambda x: x.split('.')[0])
-        session = db.s3_session()
+        session = db.session()
         error_case_list = []
         for index, row in db_df.iterrows():
             try:
@@ -807,10 +808,19 @@ class QueryListProjectSeriesResources(Resource):
         page, limit, sort_column = get_page_limit_sort(request=request, model=ListProjectStudyModel)
         query = ListProjectStudyModel.query
         filter_ = filter_schema.dump(request.json['filter_'], many=True)
+        print(filter_)
         if filter_:
-            filtered_query = apply_filters(query, filter_)
-            paginate = filtered_query.order_by(sort_column).paginate(page=page,
-                                                                     per_page=limit)
+            # filtered_query = apply_filters(query, filter_)
+            # paginate = filtered_query.order_by(sort_column).paginate(page=page,
+            #                                                          per_page=limit)
+            series_description_filter = list(filter(lambda x: x['field'] == 'series_description', filter_))
+            series_description_filter = list(
+                map(lambda x: and_(ListProjectStudyModel.series_description.op("->>")(x['value']).is_not(None)),
+                    series_description_filter))
+            orther_filter = list(filter(lambda x: x['field'] != 'series_description', filter_))
+            filtered_query = apply_filters(query, orther_filter).filter(*series_description_filter).order_by(sort_column)
+            paginate = filtered_query.paginate(page=page,
+                                               per_page=limit)
             print(filtered_query)
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
@@ -899,7 +909,7 @@ class QueryListStudyTextReportResources(Resource):
             orther_filter = list(filter(get_orther_filter, filter_))
             orther_filter = list(map(op_like_add_percent, orther_filter))
             regexp_filter = list(filter(get_regexp_filter, filter_))
-            regexp_list = get_regexp(regexp_filter,ListStudyTextReportModel)
+            regexp_list = get_regexp(regexp_filter, ListStudyTextReportModel)
             # regexp_filter = list(
             #     map(lambda x: and_(ListStudyTextReportModel..op("->>")(x['value']).is_not(None)),
             #         regexp_filter))
@@ -911,13 +921,13 @@ class QueryListStudyTextReportResources(Resource):
             print(regexp_list)
             filtered_query = apply_filters(query, orther_filter)
             temp_query = filtered_query \
-                        .filter(ListStudyTextReportModel.is_success == 1) \
-                        .filter(*regexp_list) \
-                        .order_by(sort_column)
+                .filter(ListStudyTextReportModel.is_success == 1) \
+                .filter(*regexp_list) \
+                .order_by(sort_column)
             print('temp_query')
             print(temp_query)
             print(type(temp_query))
-            paginate = temp_query.paginate(page=page,per_page=limit)
+            paginate = temp_query.paginate(page=page, per_page=limit)
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
                                                             per_page=limit)
@@ -1099,7 +1109,7 @@ class QueryStudyDownloadResources(QueryStudyResources):
             paginate = query
 
         list_study_model_result = db.session.execute(paginate.order_by(sort_column)).all()
-        list_study_model_result = list(map(lambda x:x[0], list_study_model_result))
+        list_study_model_result = list(map(lambda x: x[0], list_study_model_result))
         print(list_study_model_result)
         response_list = list(map(self.get_series_description_json, list_study_model_result))
         df = pd.json_normalize(response_list)

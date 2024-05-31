@@ -24,6 +24,7 @@ class StudyModel(db.Model):
     text              : Mapped[List["TextReportModel"]] = relationship(back_populates="study")
     project           : Mapped[List["ProjectModel"]] = relationship(secondary="project_study",
                                                                     back_populates="study")
+    project_associations : Mapped[List["ProjectStudyModel"]] = relationship(back_populates="study")
     orthanc_study_ID  : Mapped[str]       = mapped_column(String, nullable=True)
     created_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
     updated_at        : Mapped[TIMESTAMP] = mapped_column(TIMESTAMP, nullable=True)
@@ -43,6 +44,9 @@ class StudyModel(db.Model):
             'deleted_at': str(self.deleted_at),
         }
         return dict_
+
+    def __repr__(self):
+        return f'<StudyModel {self.uid.hex} {self.study_date}>'
 
 
 class TextReportModel(db.Model):
