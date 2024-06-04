@@ -2,13 +2,17 @@ import io
 import uuid
 import calendar
 import datetime
-from typing import List
+from typing import List, Dict
 
 import pandas as pd
 from flask import request, jsonify
 from flask_sqlalchemy.query import Query
 from flask_restx import Resource, fields, Namespace
 from werkzeug.datastructures.file_storage import FileStorage
+from sqlalchemy.dialects.postgresql import JSONB,NUMERIC,TEXT
+from sqlalchemy import DOUBLE
+from sqlalchemy import and_
+from sqlalchemy.sql.expression import func,cast
 from sqlalchemy_filters import apply_filters
 from app import db
 from app.model import ProjectModel, ProjectSeriesModel, ProjectStudyModel, StudyModel, SeriesModel, PatientModel
@@ -66,27 +70,57 @@ class ProjectStudyGetDataResources(Resource):
         query = ProjectStudyModel.query
 
         filter_ = schema_base.filter_schema.dump(request.json['filter_'], many=True)
+        print('filter_', filter_)
+        extra_data_filter = list(filter(lambda x:'extra_data.' in x['field'],filter_))
+        extra_data_filter = list(map(self.convert_extra_data_filter_type, extra_data_filter))
+        orther_filter = list(filter(lambda x: 'extra_data.' not in x['field'], filter_))
+
+        print('extra_data_filter', extra_data_filter)
+        print('orther_filter', orther_filter)
+        # func.jsonb
+        #
+        extra_data_filter_sqlaichemy_not_na = list(map(lambda x: and_( ProjectStudyModel.extra_data.op("->>")(x['field']).op('!=')('Na')),
+                                                       extra_data_filter))
+
+        extra_data_filter_sqlaichemy = list(map(lambda x: and_(cast(ProjectStudyModel.extra_data.op("->")(x['field']),NUMERIC).op(x['op'])(x['value'])),
+                                                extra_data_filter))
+        # extra_data_filter_sqlaichemy = list(map(lambda x: and_( ProjectStudyModel.extra_data.op("->")(x['field']).op('::')(NUMERIC).op(x['op'])(x['value'])),
+        #                              extra_data_filter))
+
+
+
+        # jsonb_typeof(project_study.extra_data) = 'object'
+        # extra_data_filter = []
+        extra_data_filter_sqlaichemy_not_na.insert(0,func.jsonb_typeof(ProjectStudyModel.extra_data) == 'object')
+        print('extra_data_filter', extra_data_filter)
         if filter_:
-            filtered_query = apply_filters(query, filter_)
+            filtered_query = apply_filters(query, orther_filter)
+            filtered_query = filtered_query.filter(*extra_data_filter_sqlaichemy_not_na).filter(*extra_data_filter_sqlaichemy)
+            # filtered_query = filtered_query.filter(*extra_data_filter_not_na)#.filter(*extra_data_filter)
+            # filtered_query
+            c = filtered_query.statement.compile(db.engine)
+            print(c.string)
+            print(c.params)
+            # df_data = pd.read_sql(sql=c.string, con=db.engine, params=c.params)
+
             paginate = filtered_query.order_by(sort_column).paginate(page=page,
                                                                      per_page=limit)
-            print(filtered_query)
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
                                                             per_page=limit)
-
-        # print(db.session.query(ProjectStudyModel.study_uid,ProjectStudyModel.extra_data,
-        #                        StudyModel.study_date,StudyModel.accession_number).join(StudyModel,
-        #                                                    ProjectStudyModel.study_uid==StudyModel.uid)
-        #       .join(PatientModel,StudyModel.patient_uid==PatientModel.uid).filter(ProjectStudyModel.extra_data))
         total = paginate.total
         list_project_study_result = paginate.items
         response_list = list(map(self.add_patient_info, list_project_study_result))
         df: pd.DataFrame = pd.json_normalize(response_list)
-        # print(df)
-        # df = df[list(project_study_items.keys())]
+
         columns = df.columns.to_list()
-        group_key = schema_base.get_group_key_by_series(columns)
+        print('columns')
+        print(columns)
+        group_key  = schema_base.get_group_key_by_series(columns)
+        group_key.update(self.get_extra_data_key(columns=columns))
+
+        # columns = list(map(lambda x: x.replace('extra_data.', ''), columns))
+        df.columns = columns
         jsonify_result = {'code': 2000,
                           'key': columns,
                           'data': {"total": total,
@@ -105,8 +139,20 @@ class ProjectStudyGetDataResources(Resource):
         study_dict['extra_data'] = project_study.extra_data
         return study_dict
 
-    def get_project_series_by_study_uid(self):
-        pass
+    def get_extra_data_key(self,columns: List[str]):
+        extra_data_key_list = list(filter(lambda x: 'extra_data' in x, columns))
+        # extra_data_key_list = list(map(lambda x: x.replace('extra_data.', ''), extra_data_key_list))
+        return {"extra_data_keys": extra_data_key_list}
+
+    def convert_extra_data_filter_type(self,extra_data_filter: Dict):
+        new_extra_data_filter = extra_data_filter.copy()
+        new_extra_data_filter['field'] = new_extra_data_filter['field'].replace('extra_data.','')
+        try:
+            new_value = float(new_extra_data_filter['value'])
+            new_extra_data_filter['value'] = new_value
+        except ValueError :
+            pass
+        return new_extra_data_filter
 
 
 @project_study_ns.route('/study')
