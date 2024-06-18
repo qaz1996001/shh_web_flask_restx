@@ -5,7 +5,7 @@ from .. import ma
 class PatientPostItemsSchema(ma.Schema):
     patient_id = mafields.String()
     gender = mafields.String()
-    birth_date = mafields.Date()
+    birth_date = mafields.Date(format = '%Y-%m-%d')
     orthanc_patient_ID = mafields.String()
 
 

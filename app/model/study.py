@@ -45,6 +45,14 @@ class StudyModel(db.Model):
         }
         return dict_
 
+    def to_dict_view(self):
+        dict_ = {
+            'study_date': str(self.study_date),
+            'study_time': str(self.study_time),
+            'study_description': self.study_description,
+            'accession_number': self.accession_number,}
+        return dict_
+
     def __repr__(self):
         return f'<StudyModel {self.uid.hex} {self.study_date}>'
 

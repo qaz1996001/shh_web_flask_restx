@@ -112,14 +112,14 @@ class ProjectsResources(Resource):
         #print(df)
         return jsonify(jsonify_result)
 
-    @project_ns.param('name', type=str)
+    @project_ns.param('name', type=str,_in="form")
     def post(self, ):
-        name = request.args.get('name')
+        name = request.form.get('name')
         project_model = ProjectModel.query.filter_by(name=name).first()
-        print(project_model)
         if not project_model:
             project_model = ProjectModel()
             project_model.name = name
+            project_model.created_at = datetime.now()
             db.session.add(project_model)
             db.session.commit()
             db.session.refresh(project_model)

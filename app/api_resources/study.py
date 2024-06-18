@@ -3,7 +3,7 @@ import datetime
 import uuid
 from typing import List
 
-from flask import request
+from flask import request, jsonify
 from flask_restx import Resource, fields, Namespace
 from .base import UidFields, Time
 from .patient import PatientResources
@@ -12,21 +12,26 @@ from ..schema import page_schema
 from .. import db
 
 study_ns = Namespace('study', description='study Resources')
-study_get_marshal = study_ns.model('study_get_marshal', {'study_uid': UidFields(attribute='uid'),
-                                                         'patient_uid': fields.String,
-                                                         'study_date': fields.String,
-                                                         'study_time': fields.String,
-                                                         'study_description': fields.String,
-                                                         'accession_number': fields.String,
-                                                         'orthanc_study_ID': fields.String,
-                                                         })
+study_get_marshal = study_ns.model('study_get_marshal',
+                                   {'study_uid': UidFields(attribute='uid'),
+                                    'patient_uid': fields.String,
+                                    'study_date': fields.String,
+                                    'study_time': fields.String,
+                                    'study_description': fields.String,
+                                    'accession_number': fields.String,
+                                    'orthanc_study_ID': fields.String,
+                                    })
 
-study_post_expect_items = study_ns.model('stydy_post_expect_items', dict(patient_uid=fields.String,
-                                                                         study_date=fields.Date,
-                                                                         study_time=Time(default=datetime.time()),
-                                                                         study_description=fields.String,
-                                                                         accession_number=fields.String,
-                                                                         orthanc_patient_ID=fields.String))
+study_post_expect_items = study_ns.model('stydy_post_expect_items',
+                                         dict(patient_id=fields.String,
+                                              gender=fields.String,
+                                              birth_date=fields.String,
+                                              orthanc_patient_ID=fields.String,
+                                              study_date=fields.Date,
+                                              study_time=Time(default=datetime.time()),
+                                              study_description=fields.String,
+                                              accession_number=fields.String,
+                                              orthanc_study_ID=fields.String))
 
 study_post_expect = study_ns.model('study_post_expect',
                                    {'data_list': fields.List(fields.Nested(study_post_expect_items))})
@@ -159,7 +164,32 @@ class StudiesResources(Resource):
 
     @study_ns.expect(study_post_expect)
     def post(self):
-        return 'StudyResources'
+        data_list = request.json['data_list']
+        result_list = []
+        if data_list:
+            for data in data_list:
+                patients_id = data.get('patient_id')
+                gender = data.get('gender')
+                birth_date = data.get('birth_date')
+                study_date = data.get('study_date')
+                study_time = data.get('study_time')
+                study_description = data.get('study_description')
+                accession_number = data.get('accession_number')
+                if (patients_id and gender and birth_date and
+                        study_date and study_time and study_description and accession_number):
+                    result = self.add_study(patient_id=patients_id,
+                                            gender=gender,
+                                            birth_date=birth_date,
+                                            study_date=study_date,
+                                            study_time=study_time,
+                                            study_description=study_description,
+                                            accession_number=accession_number,)
+                    if result:
+                        result_list.append(result)
+        response_list = list(map(lambda x: x.to_dict(), result_list))
+        response = jsonify(response_list)
+        response.status = 200
+        return response
 
     @study_ns.expect(study_put_expect)
     def put(self):
@@ -221,7 +251,7 @@ class StudiesResources(Resource):
             study = StudyModel()
             study.patient_uid = patient.uid
             study_date_time = datetime.datetime.strptime(f'{study_date}{study_time}',
-                                                         "%Y%m%d%H%M%S")
+                                                         "%Y-%m-%d%H:%M:%S")
             study.study_date = study_date_time.date()
             study.study_time = study_date_time.time()
             study.study_description = study_description
@@ -230,5 +260,36 @@ class StudiesResources(Resource):
             db.session.add(study)
             db.session.commit()
             db.session.refresh(study)
-            return study
-        return None
+        return study
+
+
+
+
+
+# study_items_1 = study_ns.model('study_find_items_1',
+#                                {'project_uid': UidFields(attribute='uid'),
+#                                 'project_name': fields.String(attribute='name'), })
+# study_items = study_ns.model('study_find_items',
+#                              {'project_uid': UidFields(),
+#                                     'project_name': fields.String, })
+
+study_find_accession_number_post_expect = study_ns.model('study_find_post_expect',
+                                                         {'accession_number_list':fields.List(fields.String)})
+@study_ns.route('/find/accession_number')
+class StudiesFindResources(Resource):
+    # return study_get_marshal
+    @study_ns.expect(study_find_accession_number_post_expect)
+    def post(self):
+
+        accession_number_list = request.json['accession_number_list']
+        study_list = StudyModel.query.filter(StudyModel.accession_number.in_(accession_number_list)).all()
+
+        response_list = []
+
+        for study in study_list:
+            patient = study.patient
+            study_dict = study.to_dict()
+            study_dict['patient_uid'] = patient.uid
+            response_list.append(study_dict)
+        result = study_ns.marshal(response_list, study_get_marshal)
+        return result

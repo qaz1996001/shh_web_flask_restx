@@ -10,18 +10,20 @@ from .base import UidFields
 from ..schema import page_schema, patient_post_items_schema
 
 patient_ns = Namespace('patient', description='Patient Resources')
-patient_get_marshal_itmes = patient_ns.model('patient_get_marshal_itmes', dict(patient_uid=UidFields(attribute='uid'),
-                                                                               patient_id=fields.String,
-                                                                               gender=fields.String,
-                                                                               age=fields.String,
-                                                                               orthanc_patient_ID=fields.String))
+patient_get_marshal_itmes = patient_ns.model('patient_get_marshal_itmes',
+                                             dict(patient_uid=UidFields(attribute='uid'),
+                                                  patient_id=fields.String,
+                                                  gender=fields.String,
+                                                  age=fields.String,
+                                                  orthanc_patient_ID=fields.String))
 patient_get_marshal = patient_ns.model('patient_get_marshal',
                                        {'items': fields.List(fields.Nested(patient_get_marshal_itmes))})
 
-patient_post_expect_items = patient_ns.model('patient_post_expect_items', dict(patient_id=fields.String,
-                                                                               gender=fields.String,
-                                                                               birth_date=fields.Date,
-                                                                               orthanc_patient_ID=fields.String))
+patient_post_expect_items = patient_ns.model('patient_post_expect_items',
+                                             dict(patient_id=fields.String,
+                                                  gender=fields.String,
+                                                  birth_date=fields.Date(),
+                                                  orthanc_patient_ID=fields.String))
 
 patient_post_expect = patient_ns.model('patient_post_expect',
                                        {'data_list': fields.List(fields.Nested(patient_post_expect_items))})
@@ -131,6 +133,7 @@ class PatientsResources(Resource):
         patient_post_items_schema_list = patient_post_items_schema.load(data=data['data_list'],
                                                                         many=True,
                                                                         unknown='exclude')
+        print(patient_post_items_schema_list)
         result_list = []
         for data in patient_post_items_schema_list:
             patient_id = data.get('patient_id')

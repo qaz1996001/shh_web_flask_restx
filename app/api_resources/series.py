@@ -56,12 +56,7 @@ class SeriesResources(Resource):
                         result_list.append(result)
         response_list = list(map(lambda x: x.to_dict(), result_list))
         response = jsonify(response_list)
-        if len(response_list) > 0:
-            response.status = 201
-            return response
-        else:
-            response.status = 200
-            return response
+        return response
 
     def put(self, ):
         return 'SeriesResources'
@@ -113,8 +108,7 @@ class SeriesResources(Resource):
             db.session.add(series)
             db.session.commit()
             db.session.refresh(series)
-            return series
-        return None
+        return series
 
 
 @series_ns.route('/<series_ns_uid>')
