@@ -132,7 +132,7 @@ class StudyResources(Resource):
             study = StudyModel()
             study.patient_uid = patient.uid
             study_date_time = datetime.datetime.strptime(f'{study_date}{study_time}',
-                                                         "%Y%m%d%H%M%S")
+                                                         "%Y-%m-%d%H:%M:%S")
             study.study_date = study_date_time.date()
             study.study_time = study_date_time.time()
             study.study_description = study_description

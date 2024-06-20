@@ -99,7 +99,7 @@ class SeriesResources(Resource):
             series = SeriesModel()
             series.study_uid = study.uid
             study_date_time = datetime.datetime.strptime(f'{series_date}{series_time}',
-                                                           "%Y%m%d%H%M%S")
+                                                           "%Y-%m-%d%H:%M:%S")
             series.series_date = study_date_time.date()
             series.series_time = study_date_time.time()
             series.series_description = series_description

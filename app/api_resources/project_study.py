@@ -2,6 +2,7 @@ import io
 import uuid
 import calendar
 import datetime
+from copy import copy
 from typing import List, Dict
 
 import pandas as pd
@@ -310,9 +311,12 @@ class ProjectStudyUploadExcelResources(Resource):
             project_study_uid = project_study_model.uid
             temp_data = df[df['project_study_uid'] == project_study_uid]
             new_extra_data = temp_data.iloc()[0, 6:].to_dict()
+            print('new_extra_data',new_extra_data)
             if project_study_model.extra_data:
-                new_extra_data.update(project_study_model.extra_data)
-                project_study_model.extra_data = new_extra_data
+                raw_extra_data = copy(project_study_model.extra_data)
+                raw_extra_data.update(new_extra_data)
+                project_study_model.extra_data = raw_extra_data
+                print('project_study_model', project_study_model.extra_data)
             else:
                 project_study_model.extra_data = new_extra_data
             project_study_model.updated_at = datetime.datetime.now()

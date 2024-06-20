@@ -76,7 +76,7 @@ class PatientResources(Resource):
             patient_model = PatientModel()
             patient_model.patient_id = patient_id
             patient_model.gender = gender
-            birth_date_obj = datetime.datetime.strptime(birth_date, "%Y%m%d")
+            birth_date_obj = datetime.datetime.strptime(birth_date, "%Y-%m-%d")
             patient_model.birth_date = birth_date_obj
             patient_model.orthanc_patient_ID = orthanc_patient_ID
             patient_model.created_at = datetime.datetime.now()
