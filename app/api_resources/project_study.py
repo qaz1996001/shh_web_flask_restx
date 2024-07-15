@@ -11,15 +11,14 @@ from flask import request, jsonify,Response
 from flask_sqlalchemy.query import Query
 from flask_restx import Resource, fields, Namespace
 from werkzeug.datastructures.file_storage import FileStorage
-from sqlalchemy.dialects.postgresql import JSONB,NUMERIC,TEXT
-from sqlalchemy import DOUBLE
+from sqlalchemy.dialects.postgresql import NUMERIC
 from sqlalchemy import and_
 from sqlalchemy.sql.expression import func,cast
 from sqlalchemy_filters import apply_filters
 from app import db
 from app.model import ProjectModel, ProjectSeriesModel, ProjectStudyModel, StudyModel, SeriesModel, PatientModel
-from app.schema import base as schema_base
-from app.schema.project_study import project_study_add_study_schema
+from app.schema import base as base_schema
+from app.schema import project_study as project_study_schema
 from .base import UidFields
 
 
@@ -44,11 +43,9 @@ post_project_study = project_study_ns.model('post_project_study',
 
 
 file_upload_parser = project_study_ns.parser()
-# file_upload_parser.add_argument('project_uid', type=str,location='form', required=True)
 file_upload_parser.add_argument('file', type=FileStorage, location='files', required=True)
 
 file_download_parser = project_study_ns.parser()
-# file_download_parser.add_argument('project_uid', type=str,location='form')
 file_download_parser.add_argument('project_name', type=str,location='form')
 file_download_parser.add_argument('format', type=str,location='form')
 # format
@@ -59,24 +56,13 @@ class ProjectStudyResourcesTest(Resource):
     def get(self):
         return 'ProjectStudyResourcesTest'
 
-field_model = {
-    "study_uid"         :'ProjectStudyModel',
-    "project_uid"       :'ProjectStudyModel',
-    "extra_data"        :'ProjectStudyModel',
-    "patient_uid"       :'PatientModel',
-    "study_date"        :'PatientModel',
-    "study_time"        :'StudyModel',
-    "study_description" :'StudyModel',
-    "accession_number"  :'StudyModel',
-}
-
 
 def get_model_by_field(field_list):
-    filter_field_list = list(filter(lambda x: field_model.get(x['field']) is not None, field_list))
+    filter_field_list = list(filter(lambda x: project_study_schema.field_model.get(x['field']) is not None, field_list))
     model_field_list = []
     for filter_field in filter_field_list:
         #  = list(map(lambda x: x['model'] = field_model.get(x['field'])) , filter_field_list))
-        filter_field['model'] = field_model.get(filter_field['field'])
+        filter_field['model'] = project_study_schema.field_model.get(filter_field['field'])
         model_field_list.append(filter_field)
     return model_field_list
 
@@ -91,14 +77,14 @@ class ProjectStudyGetDataResources(Resource):
         print('request')
         print(request.json)
         print(request.args)
-        page, limit, sort_column = schema_base.get_page_limit_sort(request=request, model=ProjectStudyModel)
+        page, limit, sort_column = base_schema.get_page_limit_sort(request=request, model=ProjectStudyModel)
         print(page, limit, sort_column)
         # query = ProjectStudyModel.query
         query: Query = db.session.query(ProjectStudyModel,StudyModel,PatientModel) \
             .join(StudyModel, ProjectStudyModel.study_uid == StudyModel.uid) \
             .join(PatientModel, StudyModel.patient_uid == PatientModel.uid)
         print(query)
-        filter_ = schema_base.filter_schema.dump(request.json['filter_'], many=True)
+        filter_ = base_schema.filter_schema.dump(request.json['filter_'], many=True)
         print('filter_', filter_)
         extra_data_filter = list(filter(lambda x:'extra_data.' in x['field'],filter_))
         extra_data_filter = list(map(self.convert_extra_data_filter_type, extra_data_filter))
@@ -139,7 +125,7 @@ class ProjectStudyGetDataResources(Resource):
         df: pd.DataFrame = pd.json_normalize(response_list)
 
         columns = df.columns.to_list()
-        group_key  = schema_base.get_group_key_by_series(columns)
+        group_key  = base_schema.get_group_key_by_series(columns)
         group_key.update(self.get_extra_data_key(columns=columns))
 
         # columns = list(map(lambda x: x.replace('extra_data.', ''), columns))
@@ -149,7 +135,7 @@ class ProjectStudyGetDataResources(Resource):
                           'data': {"total": total,
                                    "items": df.to_dict(orient='records')},
                           'group_key': group_key,
-                          'op_list': schema_base.filter_op_list}
+                          'op_list': base_schema.filter_op_list}
         return jsonify(jsonify_result)
 
     def add_info(self, item: sqlalchemy.engine.row.Row):
@@ -186,7 +172,7 @@ class ProjectStudyAddStudyResources(Resource):
 
     @project_study_ns.expect(post_project_study, validate=True)
     def post(self, ):
-        data = project_study_add_study_schema.load(request.json)
+        data = project_study_schema.project_study_add_study_schema.load(request.json)
         # data.project_uid
         print(data)
         project_model = ProjectModel.query.filter_by(uid=data['project_uid']).first()
@@ -292,7 +278,6 @@ class ProjectStudyUploadExcelResources(Resource):
     @project_study_ns.expect(file_upload_parser)
     def post(self, ):
         data = file_upload_parser.parse_args()
-        print(data)
         file: FileStorage = data['file']
         print(file.mimetype)
         print(file.filename)

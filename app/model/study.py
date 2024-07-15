@@ -1,4 +1,5 @@
 import datetime
+import re
 from typing import List
 
 from sqlalchemy import Integer, String, DateTime, UUID, TIMESTAMP, Date, Time, Uuid,ForeignKey
@@ -102,3 +103,41 @@ class TextReportRawModel(db.Model):
             'deleted_at': str(self.deleted_at),
         }
         return dict_
+
+
+
+class OnePageReportModel(db.Model):
+    __tablename__ = 'one_page_text_report'
+    uid     : Mapped[Uuid] = mapped_column(Uuid, default=gen_id, primary_key=True)
+    id      : Mapped[str]  = mapped_column(String, index=True)
+    title   : Mapped[str]  = mapped_column(String)
+    chr_no  : Mapped[str]  = mapped_column(String, index=True)
+    mod     : Mapped[str]  = mapped_column(String, index=True)
+    date    : Mapped[str]  = mapped_column(String)
+    v_date  : Mapped[str] = mapped_column(String)
+    content : Mapped[str]  = mapped_column(String)
+
+    pattern_impression_str = re.compile(r'(?i:impression\s?:?|imp:?|conclusions?:?)')
+
+    def to_dict(self):
+        dict_ = {
+            'accession_number': self.id,
+            'title': self.title,
+            'patient_id': self.chr_no,
+            'modality': self.mod,
+            'date': self.date,
+            'report': self.content,
+            'impression': self.get_impression_str(self.content),
+        }
+        return dict_
+
+    @classmethod
+    def get_impression_str(cls,x):
+        result_impression_str = cls.pattern_impression_str.split(x)
+        if len(result_impression_str) > 0:
+            return result_impression_str[-1]
+        else:
+            return ''
+
+
+__all__ = ['StudyModel','TextReportModel', 'TextReportRawModel', 'OnePageReportModel']

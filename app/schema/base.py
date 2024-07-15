@@ -1,7 +1,9 @@
 import re
-
+from flask_restx import Resource, fields, Namespace
 from flask_marshmallow.fields import fields as mafields
+
 from .. import ma
+
 
 
 
@@ -17,8 +19,13 @@ class FilterSchema(ma.Schema):
     value = mafields.String()
 
 
+
+class AccessionNumberSchema(ma.Schema):
+    accession_number_list = mafields.List(mafields.String(required=True), required=True)
+
 page_schema = PageSchema()
 filter_schema = FilterSchema()
+accession_number_schema = AccessionNumberSchema()
 
 
 filter_op_list = [
@@ -273,3 +280,21 @@ def get_group_key_by_series(columns):
     )
 
 
+
+class UidFields(fields.Raw):
+    __schema_type__ = "string"
+
+    def format(self, value):
+        if isinstance(value, uuid.UUID):
+            return value.hex
+        elif isinstance(value, str):
+            return value
+        else:
+            return value
+
+
+responses_data_model = {'total': fields.Integer,
+                        'items': fields.List(fields.Raw),}
+responses_format_model = {'code': fields.Integer,
+                          'key': fields.List(fields.String),
+                          'data': fields.Nested(responses_data_model)}

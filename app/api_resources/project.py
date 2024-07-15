@@ -8,26 +8,20 @@ from flask_restx import Resource, fields, Namespace
 from app import db
 from app.api_resources.base import UidFields
 from app.model import ProjectModel, ProjectSeriesModel, ListProjectStudyModel, ProjectStudyModel
-
+from app.schema import base as base_schema
+from app.schema import project as project_schema
 project_ns = Namespace('project', description='Project Resources')
 
-responses_data_model = project_ns.model('responses_data_model', {'total': fields.Integer,
-                                                                 'items': fields.List(
-                                                                     fields.Raw),
-                                                                 })
+responses_data_model = project_ns.model('responses_data_model',
+                                        base_schema.responses_data_model)
 responses_format_model = project_ns.model('responses_format_model',
-                                          {'code': fields.Integer,
-                                           'key': fields.List(fields.String),
-                                           'data': fields.Nested(responses_data_model)}
-                                          )
+                                          base_schema.responses_format_model)
+
 project_get = project_ns.model('project_get',
-                               dict(project_uid=UidFields(attribute='uid'),
-                                    project_name=fields.String(attribute='name'),
-                                    ))
+                               project_schema.project_get)
 
 project_items_1 = project_ns.model('project_items_1',
-                                   {'project_uid': UidFields(attribute='uid'),
-                                    'project_name': fields.String(attribute='name'), })
+                                   project_schema.project_items_1)
 project_items = project_ns.model('project_items',
                                  {'project_uid': UidFields(), 'project_name': fields.String, })
 project_data = project_ns.clone('project_data',
@@ -127,3 +121,4 @@ class ProjectsResources(Resource):
             return {'data': project_model.to_dict()}, 201
         else:
             return {'error': 'project name already exists'}, 400
+
