@@ -1,4 +1,6 @@
 import re
+import uuid
+
 from flask_restx import Resource, fields, Namespace
 from flask_marshmallow.fields import fields as mafields
 

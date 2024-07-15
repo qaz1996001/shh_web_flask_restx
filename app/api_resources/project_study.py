@@ -279,8 +279,7 @@ class ProjectStudyUploadExcelResources(Resource):
     def post(self, ):
         data = file_upload_parser.parse_args()
         file: FileStorage = data['file']
-        print(file.mimetype)
-        print(file.filename)
+
         file_obj = io.BytesIO()
         file.save(file_obj)
         file_obj.seek(0)
@@ -290,18 +289,17 @@ class ProjectStudyUploadExcelResources(Resource):
                                             })
         df['study_date'] = pd.to_datetime(df['study_date'])
         df['project_study_uid'] = df['project_study_uid'].map(lambda x: uuid.UUID(x))
+        df.fillna('', inplace=True)
         project_study_uid_list = df['project_study_uid'].to_list()
         project_study_model_list: List[ProjectStudyModel] = ProjectStudyModel.query.filter(ProjectStudyModel.uid.in_(project_study_uid_list)).all()
         for project_study_model in project_study_model_list:
             project_study_uid = project_study_model.uid
             temp_data = df[df['project_study_uid'] == project_study_uid]
             new_extra_data = temp_data.iloc()[0, 6:].to_dict()
-            print('new_extra_data',new_extra_data)
             if project_study_model.extra_data:
                 raw_extra_data = copy(project_study_model.extra_data)
                 raw_extra_data.update(new_extra_data)
                 project_study_model.extra_data = raw_extra_data
-                print('project_study_model', project_study_model.extra_data)
             else:
                 project_study_model.extra_data = new_extra_data
             project_study_model.updated_at = datetime.datetime.now()
