@@ -196,7 +196,6 @@ class ProjectStudyAddStudyResources(Resource):
             db.session.commit()
             return jsonify({'code': 2000,})
         else:
-            import sqlalchemy
             return jsonify({'code': 400,})
         # project_uid = request.json['project_uid']
         # study_uid_list = request.json['study_uid_list']
@@ -348,6 +347,7 @@ class ProjectStudyDownloadResources(Resource):
                 return jsonify(df_data.to_dict('records'))
             else:
                 return jsonify(df_data.to_dict('records'))
+
 
 
 def get_age_by_study_date(birth_date, study_date):

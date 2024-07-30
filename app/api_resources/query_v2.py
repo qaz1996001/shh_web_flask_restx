@@ -668,7 +668,6 @@ class QueryStudyResources(Resource):
                                                             per_page=limit)
         list_study_model_result = paginate.items
         total = paginate.total
-        # response_list = list(map(lambda x: x.to_dict(), list_study_model_result))
         response_list = list(map(self.get_series_description_json, list_study_model_result))
         df = pd.json_normalize(response_list)
         columns = list(

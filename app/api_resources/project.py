@@ -106,11 +106,11 @@ class ProjectsResources(Resource):
         #print(df)
         return jsonify(jsonify_result)
 
-    @project_ns.param('name', type=str,_in="form")
+    @project_ns.param('name', type=str)
     def post(self, ):
-        name = request.form.get('name')
+        name = request.args.get('name')
         project_model = ProjectModel.query.filter_by(name=name).first()
-        if not project_model:
+        if project_model is None:
             project_model = ProjectModel()
             project_model.name = name
             project_model.created_at = datetime.now()
@@ -121,4 +121,5 @@ class ProjectsResources(Resource):
             return {'data': project_model.to_dict()}, 201
         else:
             return {'error': 'project name already exists'}, 400
+
 
