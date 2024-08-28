@@ -77,7 +77,9 @@ class ProjectStudyGetDataResources(Resource):
         print('request')
         print(request.json)
         print(request.args)
-        page, limit, sort_column = base_schema.get_page_limit_sort(request=request, model=ProjectStudyModel)
+        page, limit, sort_column = base_schema.get_page_limit_sort(request=request,
+                                                                   model=ProjectStudyModel,
+                                                                   default = '+study_uid')
         print(page, limit, sort_column)
         # query = ProjectStudyModel.query
         query: Query = db.session.query(ProjectStudyModel,StudyModel,PatientModel) \
@@ -90,9 +92,10 @@ class ProjectStudyGetDataResources(Resource):
         extra_data_filter = list(map(self.convert_extra_data_filter_type, extra_data_filter))
         orther_filter = list(filter(lambda x: 'extra_data.' not in x['field'], filter_))
 
-        print('extra_data_filter', extra_data_filter)
+        # print('extra_data_filter', extra_data_filter)
         print('orther_filter', orther_filter)
         orther_filter = get_model_by_field(orther_filter)
+        print('orther_filter', orther_filter)
         extra_data_filter_sqlaichemy_not_na = list(map(lambda x: and_( ProjectStudyModel.extra_data.op("->>")(x['field']).op('!=')('Na')),
                                                        extra_data_filter))
 
@@ -100,35 +103,34 @@ class ProjectStudyGetDataResources(Resource):
                                                 extra_data_filter))
         # extra_data_filter = []
         extra_data_filter_sqlaichemy_not_na.insert(0,func.jsonb_typeof(ProjectStudyModel.extra_data) == sqlalchemy.text("\'object\'"))
-        print('extra_data_filter', extra_data_filter)
+        # print('extra_data_filter', extra_data_filter)
         if filter_:
             filtered_query = apply_filters(query, orther_filter)
             filtered_query = filtered_query.filter(*extra_data_filter_sqlaichemy_not_na).filter(*extra_data_filter_sqlaichemy)
-            # c = filtered_query.statement.compile(db.engine)
-            # print(c.string)
-            # print(c.params)
-            # df_data = pd.read_sql(sql=c.string, con=db.engine, params=c.params)
 
             paginate = filtered_query.order_by(sort_column).paginate(page=page,
                                                                      per_page=limit)
-            print('filtered_query', filtered_query)
+            # print('filtered_query', filtered_query)
         else:
             paginate = query.order_by(sort_column).paginate(page=page,
                                                             per_page=limit)
-        # c = filtered_query.statement.compile(db.engine)
-        # print(c.string)
-        # print(c.params)
         total = paginate.total
         print('total',total)
         list_project_study_result = paginate.items
         response_list = list(map(self.add_info, list_project_study_result))
         df: pd.DataFrame = pd.json_normalize(response_list)
 
-        columns = df.columns.to_list()
-        group_key  = base_schema.get_group_key_by_series(columns)
-        group_key.update(self.get_extra_data_key(columns=columns))
 
-        # columns = list(map(lambda x: x.replace('extra_data.', ''), columns))
+
+        columns = df.columns.to_list()
+
+        group_key = base_schema.get_group_key_by_series(columns)
+        extra_key = self.get_extra_data_key(columns=columns)
+
+        print(df.columns)
+
+        group_key.update(extra_key)
+
         df.columns = columns
         jsonify_result = {'code': 2000,
                           'key': columns,

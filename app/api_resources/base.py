@@ -1,6 +1,7 @@
 import uuid
-
 from flask_restx import fields
+from flask_restx.inputs import datetime_from_iso8601
+from datetime import datetime, time
 
 
 def json_list(value):
@@ -27,8 +28,6 @@ class CountFields(fields.Raw):
         return len(value)
 
 
-from flask_restx.inputs import datetime_from_iso8601
-from datetime import datetime, time
 
 
 def time_from_iso8601(value):
@@ -48,9 +47,6 @@ def time_from_iso8601(value):
 
     """
     return datetime_from_iso8601(value).time()
-
-
-# time_from_iso8601.__schema__ = {"type": "string", "format": "time"}
 
 
 class Time(fields.Date):

@@ -17,6 +17,8 @@ field_model = {
     "study_uid"         :'ProjectStudyModel',
     "project_uid"       :'ProjectStudyModel',
     "extra_data"        :'ProjectStudyModel',
+    "patient_id"        :'PatientModel',
+    "gender"            :'PatientModel',
     "patient_uid"       :'PatientModel',
     "study_date"        :'PatientModel',
     "study_time"        :'StudyModel',

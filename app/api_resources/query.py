@@ -1,8 +1,7 @@
 from copy import copy
 import orjson
 from flask_restx import Resource, fields, Namespace
-import datetime
-import pathlib
+
 import time
 import uuid
 from typing import List
@@ -10,7 +9,7 @@ import pandas as pd
 from sqlalchemy.sql.expression import func, distinct
 
 from flask import jsonify, request
-from .base import UidFields, CountFields
+from .base import UidFields
 from ..model import PatientModel, StudyModel, ProjectModel, ProjectSeriesModel, TextReportModel, \
     SeriesModel
 from .series import SeriesResources
@@ -157,14 +156,10 @@ def get_page_limit_sort(request):
 @query_ns.route('/')
 class QueryResources(Resource):
     def get(self, ):
-        query = PatientModel.query
-        patient_model: PatientModel = query.first()
-        print(patient_model.study)
-        print(patient_model.study[0].series)
-        for series in patient_model.study[0].series:
-            print(series.series_description)
-            print(series.project[0].name)
-
+        sort = list(StudyModel.__dict__['__annotations__'].items())[0][0]
+        sort_column = getattr(StudyModel, sort)
+        print(sort)
+        print(sort_column)
         return 'QueryResources'
 
 

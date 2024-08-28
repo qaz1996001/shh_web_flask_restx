@@ -354,7 +354,12 @@ def get_page_limit_sort(request, model, default=None):
         sort = default
     order_by = sort[0]
     sort = sort[1:]
-    sort_column = getattr(model, sort)
+    if hasattr(model, sort):
+        sort_column = getattr(model, sort)
+    else:
+        sort = list(model.__dict__['__annotations__'].items())[0][0]
+        sort_column = getattr(model, sort)
+
     if order_by == '+':
         sort_column = sort_column.asc()
     else:
